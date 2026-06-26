@@ -29,11 +29,11 @@ export default function SecurityPage() {
           return;
         }
 
-        const { data: profile } = await supabaseBrowser
+        const { data: profile } = await (supabaseBrowser
           .from("profiles")
           .select("pin")
           .eq("id", user.id)
-          .single();
+          .single() as any);
 
         const storedPin = profile?.pin || user.user_metadata?.transaction_pin;
         setHasPin(!!storedPin);

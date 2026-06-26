@@ -2,6 +2,7 @@
 
 import { supabase } from "./supabaseClient";
 import { createServerClient } from "./supabaseServer";
+import { ensureDbColumnsExist } from "./dbAdmin";
 
 // ─── Sign Up ─────────────────────────────────────────────────────────────────
 export async function signUp(
@@ -59,28 +60,48 @@ export async function updatePassword(newPassword: string) {
 // ─── Update Transaction PIN ───────────────────────────────────────────────────
 export async function updateTransactionPin(currentPin: string | null, newPin: string) {
   try {
+    await ensureDbColumnsExist();
     const { client, accessToken } = await createServerClient();
     if (!accessToken) throw new Error("Unauthorized");
 
     const { data: { user }, error: userError } = await client.auth.getUser(accessToken);
     if (userError || !user) throw new Error("Unauthorized");
 
-    const { data: profile } = await client
-      .from("profiles")
-      .select("pin")
-      .eq("id", user.id)
-      .single();
+    let storedPin: string | null = null;
+    try {
+      const { data: profile } = await (client as any)
+        .from("profiles")
+        .select("pin")
+        .eq("id", user.id)
+        .single();
+      storedPin = profile?.pin || null;
+    } catch (e) {
+      console.warn("[9jaPulse] profiles.pin column missing or PostgREST cache stale during select:", e);
+    }
 
-    const storedPin = profile?.pin || user.user_metadata?.transaction_pin;
+    if (!storedPin) {
+      storedPin = user.user_metadata?.transaction_pin || null;
+    }
+
     if (storedPin && String(currentPin) !== String(storedPin)) {
       throw new Error("Incorrect current PIN");
     }
 
-    const { error: dbError } = await client
+    const { error: dbError } = await (client as any)
       .from("profiles")
       .update({ pin: newPin })
       .eq("id", user.id);
-    if (dbError) throw new Error(dbError.message);
+      
+    if (dbError) {
+      const isMissingColumn = dbError.code === "PGRST100" || 
+                              dbError.message?.includes("column") || 
+                              dbError.message?.includes("cache") ||
+                              dbError.message?.includes("not find");
+      if (!isMissingColumn) {
+        throw new Error(dbError.message);
+      }
+      console.warn("[9jaPulse] profiles.pin column missing or PostgREST cache stale. Storing PIN in auth metadata only.");
+    }
 
     const { error: authError } = await client.auth.updateUser({
       data: { transaction_pin: newPin }

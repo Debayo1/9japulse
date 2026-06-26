@@ -56,7 +56,7 @@ export default function Header({
         position: "sticky",
         top: 0,
         zIndex: 40,
-        margin: "0 -1.25rem 1.25rem -1.25rem",
+        margin: "-1.25rem -1.25rem 1.25rem -1.25rem",
         background: "var(--bg-glass)",
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",

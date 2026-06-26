@@ -1,9 +1,12 @@
 "use server";
 
 import { createServiceClient } from "../supabaseServer";
+import { ensureDbColumnsExist } from "../dbAdmin";
 
 // ─── Fetch GSubz API key from provider_keys table ──────────────────────────────
 async function getGSubzApiKey(): Promise<string> {
+  await ensureDbColumnsExist();
+
   const svc = createServiceClient();
   const { data, error } = await (svc as any)
     .from("provider_keys")

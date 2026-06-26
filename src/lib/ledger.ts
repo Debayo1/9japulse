@@ -131,15 +131,63 @@ export async function moveFunds(
   return { balance_total: newTotal, balance_withdrawable: newWithdrawable };
 }
 
-// ─── Get wallet for user ──────────────────────────────────────────────────────
+// ─── Get wallet for user (with automatic database self-healing for profiles/wallets) ───
 export async function getWallet(userId: string): Promise<Wallet> {
+  // 1. Ensure profile exists first
+  try {
+    const { data: profile } = await (supabase as any)
+      .from("profiles")
+      .select("id")
+      .eq("id", userId)
+      .single();
+
+    if (!profile) {
+      console.warn(`[9jaPulse] Profile not found for user ${userId}, recreating profile row...`);
+      // Fetch user information from Auth using admin client
+      const { data: authUser, error: authErr } = await supabase.auth.admin.getUserById(userId);
+      if (!authErr && authUser?.user) {
+        const u = authUser.user;
+        const { error: profileErr } = await (supabase as any)
+          .from("profiles")
+          .insert({
+            id: userId,
+            email: u.email!,
+            full_name: u.user_metadata?.full_name || null,
+            phone: u.user_metadata?.phone || null,
+            pin: u.user_metadata?.transaction_pin || null
+          });
+        if (profileErr) {
+          console.error("[9jaPulse] Profile self-healing insert error:", profileErr.message);
+        }
+      } else {
+        console.error("[9jaPulse] Profile self-healing failed to fetch auth user:", authErr?.message);
+      }
+    }
+  } catch (err: any) {
+    console.error("[9jaPulse] Profile self-healing check error:", err.message || err);
+  }
+
+  // 2. Fetch or create wallet
   const { data, error } = await (supabase as any)
     .from("wallets")
     .select("*")
     .eq("user_id", userId)
     .single() as { data: Wallet | null; error: any };
 
-  if (error || !data) throw new Error(error?.message ?? "Wallet not found");
+  if (error || !data) {
+    console.warn(`[9jaPulse] Wallet not found for user ${userId}, creating one...`);
+    const { data: newWallet, error: createError } = await (supabase as any)
+      .from("wallets")
+      .insert({ user_id: userId, balance_total: 0, balance_withdrawable: 0 })
+      .select()
+      .single();
+    
+    if (createError) {
+      console.error("[9jaPulse] Wallet self-healing insert error:", createError.message);
+      throw new Error(createError.message);
+    }
+    return newWallet as Wallet;
+  }
   return data;
 }
 

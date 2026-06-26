@@ -101,3 +101,47 @@ export function SkeletonText({ width = "60%", height = 14 }: { width?: string; h
     />
   );
 }
+
+export function SkeletonForm() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }} aria-hidden="true">
+      {/* Header Back Button + Title */}
+      <div style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "0.5rem 0", marginBottom: "0.5rem" }}>
+        <div className="skeleton" style={{ width: 34, height: 34, borderRadius: "50%" }} />
+        <div className="skeleton" style={{ height: 16, width: "35%", borderRadius: 6 }} />
+      </div>
+      
+      {/* Phone Field */}
+      <div>
+        <div className="skeleton" style={{ height: 12, width: 80, borderRadius: 4, marginBottom: 8 }} />
+        <div className="skeleton" style={{ height: 48, width: "100%", borderRadius: "16px" }} />
+      </div>
+      
+      {/* Provider/Network Grid */}
+      <div>
+        <div className="skeleton" style={{ height: 12, width: 100, borderRadius: 4, marginBottom: 8 }} />
+        <div style={{ display: "flex", gap: "0.75rem" }}>
+          <div className="skeleton" style={{ flex: 1, height: 54, borderRadius: "14px" }} />
+          <div className="skeleton" style={{ flex: 1, height: 54, borderRadius: "14px" }} />
+          <div className="skeleton" style={{ flex: 1, height: 54, borderRadius: "14px" }} />
+          <div className="skeleton" style={{ flex: 1, height: 54, borderRadius: "14px" }} />
+        </div>
+      </div>
+
+      {/* Amount Field */}
+      <div>
+        <div className="skeleton" style={{ height: 12, width: 60, borderRadius: 4, marginBottom: 8 }} />
+        <div className="skeleton" style={{ height: 48, width: "100%", borderRadius: "14px" }} />
+      </div>
+
+      {/* PIN Field */}
+      <div>
+        <div className="skeleton" style={{ height: 12, width: 120, borderRadius: 4, marginBottom: 8 }} />
+        <div className="skeleton" style={{ height: 48, width: "100%", borderRadius: "14px" }} />
+      </div>
+
+      {/* Submit Button */}
+      <div className="skeleton" style={{ height: 48, width: "100%", borderRadius: "14px", marginTop: "1rem" }} />
+    </div>
+  );
+}

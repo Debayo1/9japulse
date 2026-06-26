@@ -1,4 +1,4 @@
-import { UserCircle, CaretRight, SignOut, Gear, Question, ShieldCheck, Bell, ShareNetwork } from "@phosphor-icons/react/dist/ssr";
+import { UserCircle, CaretRight, SignOut, Gear, Question, ShieldCheck, Bell, ShareNetwork, Wrench } from "@phosphor-icons/react/dist/ssr";
 import { getUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -8,6 +8,7 @@ import Link from "next/link";
 const MENU_ITEMS = [
   { label: "Account Settings",    Icon: Gear,         href: "/me/settings"   },
   { label: "Security & Privacy",  Icon: ShieldCheck,  href: "/me/security"   },
+  { label: "Admin Panel (DB & Keys)", Icon: Wrench,   href: "/admin/keys"    },
   { label: "Notifications",       Icon: Bell,         href: "/me/notifs"     },
   { label: "Refer & Earn",        Icon: ShareNetwork, href: "/me/referral"   },
   { label: "Help & Support",      Icon: Question,     href: "/me/support"    },

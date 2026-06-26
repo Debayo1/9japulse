@@ -56,52 +56,54 @@ async function HomeContent() {
         <h2 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "0.5rem" }}>
           Quick Services
         </h2>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: "1rem",
-          }}
-        >
-          {SERVICES.map(({ label, Icon, href, color }) => (
-            <Link
-              key={href}
-              href={href}
-              style={{ textDecoration: "none" }}
-              className="service-shortcut"
-            >
-              <div
-                style={{
-                  width: 58,
-                  height: 58,
-                  borderRadius: 18,
-                  background: `${color}0D`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: "0.5rem",
-                  color: color,
-                  transition: "all var(--duration-fast) var(--ease-smooth)",
-                }}
-                className="shortcut-icon-wrapper"
+        <div className="card" style={{ padding: "1.25rem 1rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gap: "1.25rem 1rem",
+            }}
+          >
+            {SERVICES.map(({ label, Icon, href, color }) => (
+              <Link
+                key={href}
+                href={href}
+                style={{ textDecoration: "none" }}
+                className="service-shortcut"
               >
-                <Icon size={24} weight="duotone" color={color} />
-              </div>
-              <span
-                style={{
-                  fontSize: "0.6875rem",
-                  fontWeight: 600,
-                  color: "var(--text-secondary)",
-                  textAlign: "center",
-                  display: "block",
-                  transition: "color var(--duration-fast) var(--ease-smooth)",
-                }}
-                className="shortcut-label"
-              >
-                {label}
-              </span>
-            </Link>
-          ))}
+                <div
+                  style={{
+                    width: 58,
+                    height: 58,
+                    borderRadius: 18,
+                    background: `${color}0D`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: "0.5rem",
+                    color: color,
+                    transition: "all var(--duration-fast) var(--ease-smooth)",
+                  }}
+                  className="shortcut-icon-wrapper"
+                >
+                  <Icon size={24} weight="duotone" color={color} />
+                </div>
+                <span
+                  style={{
+                    fontSize: "0.6875rem",
+                    fontWeight: 600,
+                    color: "var(--text-secondary)",
+                    textAlign: "center",
+                    display: "block",
+                    transition: "color var(--duration-fast) var(--ease-smooth)",
+                  }}
+                  className="shortcut-label"
+                >
+                  {label}
+                </span>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 

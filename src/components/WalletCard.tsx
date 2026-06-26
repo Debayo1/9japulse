@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeSlash, ArrowCircleDown, ArrowCircleUp, Copy } from "@phosphor-icons/react";
+import { Eye, EyeSlash, ArrowCircleDown, ArrowCircleUp, Copy, ClockCounterClockwise } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
@@ -121,30 +121,55 @@ export default function WalletCard({
           }}
         >
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <span style={{ fontSize: "0.8125rem", fontWeight: 600, opacity: 0.9 }}>
                 Hi, {userName.split(" ")[0]}
               </span>
-              <div
-                onClick={copyAccount}
-                className="bank-pill"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px",
-                  background: "rgba(0, 0, 0, 0.05)",
-                  padding: "3px 8px",
-                  borderRadius: "10px",
-                  fontSize: "0.625rem",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  transition: "all var(--duration-fast)",
-                  border: "1px solid rgba(0, 0, 0, 0.04)",
-                  color: "inherit",
-                }}
-              >
-                <span>9jaPulse MFB • 9070578999</span>
-                <Copy size={11} weight="regular" />
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
+                <div
+                  onClick={copyAccount}
+                  className="bank-pill"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    background: "rgba(0, 0, 0, 0.05)",
+                    padding: "3px 8px",
+                    borderRadius: "10px",
+                    fontSize: "0.625rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    transition: "all var(--duration-fast)",
+                    border: "1px solid rgba(0, 0, 0, 0.04)",
+                    color: "inherit",
+                  }}
+                >
+                  <span>9jaPulse MFB • 9070578999</span>
+                  <Copy size={11} weight="regular" />
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toast.info("Funding virtual accounts created in dashboard");
+                  }}
+                  style={{
+                    background: "var(--color-primary)",
+                    color: "#ffffff",
+                    border: "none",
+                    padding: "3px 8px",
+                    borderRadius: "8px",
+                    fontSize: "0.625rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "3px",
+                    boxShadow: "0 2px 6px hsl(243 75% 58% / 0.15)",
+                  }}
+                >
+                  <ArrowCircleDown size={12} weight="fill" />
+                  Add Money
+                </button>
               </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1rem" }}>
@@ -249,10 +274,10 @@ export default function WalletCard({
                 height: "44px",
                 borderRadius: "22px",
               }}
-              onClick={() => toast.info("Funding virtual accounts created in dashboard")}
+              onClick={() => toast.info("Transfers feature coming soon")}
             >
-              <ArrowCircleDown size={18} weight="fill" />
-              Add Money
+              <ArrowCircleUp size={18} weight="fill" />
+              Transfer
             </button>
             <button
               className="btn btn-wallet-action"
@@ -262,10 +287,10 @@ export default function WalletCard({
                 height: "44px",
                 borderRadius: "22px",
               }}
-              onClick={() => toast.info("Transfers feature coming soon")}
+              onClick={() => router.push("/history")}
             >
-              <ArrowCircleUp size={18} weight="fill" />
-              Transfer
+              <ClockCounterClockwise size={18} weight="fill" />
+              History
             </button>
           </div>
         )}
