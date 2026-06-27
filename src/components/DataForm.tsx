@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Header from "./Header";
 import { Info, WifiHigh } from "@phosphor-icons/react";
@@ -55,6 +56,7 @@ const NETWORKS = [
 ];
 
 export default function DataForm({ walletId, initialWithdrawable }: DataFormProps) {
+  const router = useRouter();
   const [network, setNetwork] = useState("mtn");
   const [phone, setPhone] = useState("");
   const [planIndex, setPlanIndex] = useState(0);
@@ -129,6 +131,8 @@ export default function DataForm({ walletId, initialWithdrawable }: DataFormProp
         setShowConfirm(false);
         setPhone("");
         setPin("");
+        
+        router.push(`/services/success?type=data&amount=${selectedPlan.price}&phone=${phone}&network=${network}&plan=${encodeURIComponent(selectedPlan.label)}&ref=${json.reference || ""}`);
       } catch (err: unknown) {
         toast.error((err as Error).message ?? "Purchase failed");
       }

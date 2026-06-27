@@ -34,7 +34,7 @@ async function HomeContent() {
   if (!user) redirect("/login");
 
   const wallet = await getWallet(user.id);
-  const { transactions } = await getTransactions(wallet.id, 0, 5);
+  const { transactions } = await getTransactions(wallet.id, 0, 2);
 
   const fullName = (user.user_metadata?.full_name as string) ?? user.email ?? "User";
 
@@ -50,6 +50,20 @@ async function HomeContent() {
         balanceWithdrawable={wallet.balance_withdrawable}
         userName={fullName}
       />
+
+      {/* Recent Transactions (Brought up under balance card) */}
+      <section style={{ marginBottom: "1.25rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+          <h2 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0 }}>Recent Transactions</h2>
+          <Link
+            href="/history"
+            style={{ fontSize: "0.78rem", color: "var(--color-primary)", fontWeight: 600, textDecoration: "none" }}
+          >
+            See all
+          </Link>
+        </div>
+        <HistoryList transactions={transactions} walletId={wallet.id} />
+      </section>
 
       {/* Quick Services */}
       <section style={{ marginBottom: "1.5rem" }}>
@@ -73,20 +87,20 @@ async function HomeContent() {
               >
                 <div
                   style={{
-                    width: 58,
-                    height: 58,
-                    borderRadius: 18,
+                    width: 50,
+                    height: 50,
+                    borderRadius: 16,
                     background: `${color}0D`,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    marginBottom: "0.5rem",
+                    marginBottom: "0.4rem",
                     color: color,
                     transition: "all var(--duration-fast) var(--ease-smooth)",
                   }}
                   className="shortcut-icon-wrapper"
                 >
-                  <Icon size={24} weight="duotone" color={color} />
+                  <Icon size={20} weight="duotone" color={color} />
                 </div>
                 <span
                   style={{
@@ -109,20 +123,6 @@ async function HomeContent() {
 
       {/* Promo Wealth Banner */}
       <PromoBanner />
-
-      {/* Recent Transactions */}
-      <section>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-          <h2 style={{ fontSize: "1rem", fontWeight: 700 }}>Recent Transactions</h2>
-          <Link
-            href="/history"
-            style={{ fontSize: "0.8125rem", color: "var(--color-primary)", fontWeight: 600, textDecoration: "none" }}
-          >
-            See all
-          </Link>
-        </div>
-        <HistoryList transactions={transactions} walletId={wallet.id} />
-      </section>
 
       <style>{`
         .service-shortcut {

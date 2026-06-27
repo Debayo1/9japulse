@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import {
   DeviceMobile,
@@ -86,13 +87,19 @@ export function TransactionRow({ txn }: TransactionRowProps) {
   const Icon = config.Icon ?? Question;
 
   return (
-    <div
+    <Link
+      href={`/history/${txn.id}`}
       style={{
         display: "flex",
         alignItems: "center",
         gap: "0.875rem",
         padding: "0.875rem 0.5rem",
+        textDecoration: "none",
+        color: "inherit",
+        borderRadius: "12px",
+        transition: "all var(--duration-fast)",
       }}
+      className="history-row"
     >
       {/* Dynamic Overlapping Avatar Icon Group */}
       <div style={{ position: "relative", width: "40px", height: "40px", flexShrink: 0 }}>
@@ -162,7 +169,7 @@ export function TransactionRow({ txn }: TransactionRowProps) {
           {fmtTime(txn.created_at)}
         </p>
       </div>
-    </div>
+    </Link>
   );
 }
 

@@ -44,14 +44,24 @@ export default function AdminKeysPage() {
   };
 
   useEffect(() => {
-    supabaseBrowser.auth.getSession().then(({ data }) => {
-      const role = String(data.session?.user?.user_metadata?.role ?? data.session?.user?.app_metadata?.role ?? "").toLowerCase();
-      if (!data.session || role !== "admin") {
+    async function checkAccess() {
+      const { data: { session } } = await supabaseBrowser.auth.getSession();
+      if (!session) {
+        router.replace("/login");
+        return;
+      }
+
+      const { checkAdminStatus } = await import("@/lib/admin");
+      const isAdmin = await checkAdminStatus();
+      if (!isAdmin) {
+        toast.error("Access denied: Admin role required.");
         router.replace("/home");
         return;
       }
+
       loadKeys(true);
-    });
+    }
+    checkAccess();
   }, [router]);
 
   const handleTestConnection = () => {

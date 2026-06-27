@@ -33,7 +33,7 @@ export default function BottomNav() {
             aria-current={isActive ? "page" : undefined}
           >
             <Icon
-              size={22}
+              size={18}
               weight={isActive ? "fill" : "regular"}
               aria-hidden="true"
             />

@@ -5,6 +5,7 @@ import { getUser } from "@/lib/auth";
 import { isAdminUser } from "@/lib/admin";
 import { createServiceClient } from "@/lib/supabaseServer";
 import { ensureDbColumnsExist } from "@/lib/dbAdmin";
+import AdminPromoter from "@/components/AdminPromoter";
 
 async function AdminDashboard() {
   const user = await getUser();
@@ -72,6 +73,8 @@ async function AdminDashboard() {
           <Link href="/me/settings" className="btn btn-secondary">App Settings</Link>
         </div>
       </div>
+
+      <AdminPromoter />
 
       <div className="card" style={{ padding: "1rem", marginBottom: "1rem" }}>
         <h2 style={{ marginBottom: "0.75rem" }}>Recent Users</h2>
