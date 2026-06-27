@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Header from "./Header";
-import { DeviceMobile, CheckCircle, WarningCircle } from "@phosphor-icons/react";
+import { DeviceMobile } from "@phosphor-icons/react";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 interface AirtimeFormProps {
@@ -22,7 +21,6 @@ const NETWORKS = [
 const PRESETS = [100, 200, 500, 1000, 2000, 5000];
 
 export default function AirtimeForm({ walletId, initialWithdrawable }: AirtimeFormProps) {
-  const router = useRouter();
   const [network, setNetwork] = useState("mtn");
   const [phone, setPhone] = useState("");
   const [amount, setAmount] = useState("");
@@ -101,7 +99,6 @@ export default function AirtimeForm({ walletId, initialWithdrawable }: AirtimeFo
         setPhone("");
         setAmount("");
         setPin("");
-        router.refresh();
       } catch (err: unknown) {
         toast.error((err as Error).message ?? "Purchase failed");
       }

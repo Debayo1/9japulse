@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Envelope, Lock, Eye, EyeSlash } from "@phosphor-icons/react";
@@ -11,11 +11,6 @@ export default function LoginPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showPwd, setShowPwd] = useState(false);
-
-  useEffect(() => {
-    // Clear any leftover client session (e.g. from signout)
-    supabaseBrowser.auth.signOut().catch(() => {});
-  }, []);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -44,7 +39,7 @@ export default function LoginPage() {
         }
 
         toast.success("Welcome back!");
-        window.location.href = "/home";
+        router.replace("/home");
       } catch (err: unknown) {
         toast.error((err as Error).message ?? "Login failed");
       }
@@ -113,7 +108,7 @@ export default function LoginPage() {
       </form>
 
       <p style={{ textAlign: "center", marginTop: "1.75rem", color: "var(--text-secondary)", fontSize: "0.9rem" }}>
-        Don't have an account?{" "}
+        Don&apos;t have an account?{" "}
         <Link href="/register" style={{ color: "var(--color-primary)", fontWeight: 600, textDecoration: "none" }}>
           Create one
         </Link>

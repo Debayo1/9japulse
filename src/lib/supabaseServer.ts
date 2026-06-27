@@ -79,28 +79,33 @@ export function createServiceClient() {
  * from Next.js dynamic headers (next/headers cookies).
  * Use this in Server Components and Server Actions.
  */
-export async function createServerClient() {
-  let accessToken: string | null = null;
-  let refreshToken: string | null = null;
+export async function createServerClient(
+  accessTokenOverride: string | null = null,
+  refreshTokenOverride: string | null = null
+) {
+  let accessToken: string | null = accessTokenOverride;
+  let refreshToken: string | null = refreshTokenOverride;
 
   try {
-    const cookieStore = await cookies();
-    const allCookies = cookieStore.getAll();
+    if (!accessToken) {
+      const cookieStore = await cookies();
+      const allCookies = cookieStore.getAll();
 
-    for (const cookie of allCookies) {
-      if (cookie.name.startsWith("sb-") && cookie.name.endsWith("-auth-token")) {
-        try {
-          const parsed = JSON.parse(decodeURIComponent(cookie.value));
-          if (parsed?.access_token) {
-            accessToken = parsed.access_token;
+      for (const cookie of allCookies) {
+        if (cookie.name.startsWith("sb-") && cookie.name.endsWith("-auth-token")) {
+          try {
+            const parsed = JSON.parse(decodeURIComponent(cookie.value));
+            if (parsed?.access_token) {
+              accessToken = parsed.access_token;
+            }
+            if (parsed?.refresh_token) {
+              refreshToken = parsed.refresh_token;
+            }
+          } catch {
+            accessToken = cookie.value;
           }
-          if (parsed?.refresh_token) {
-            refreshToken = parsed.refresh_token;
-          }
-        } catch {
-          accessToken = cookie.value;
+          break;
         }
-        break;
       }
     }
   } catch (e) {

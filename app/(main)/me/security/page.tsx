@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Key, ShieldCheck, CheckCircle } from "@phosphor-icons/react";
+import { ShieldCheck } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import Header from "@/components/Header";
 import { updateTransactionPin } from "@/lib/auth";
@@ -68,11 +68,22 @@ export default function SecurityPage() {
 
     startTransition(async () => {
       try {
-        await updateTransactionPin(hasPin ? currentPin : null, newPin);
+        const { data: sessionData } = await supabaseBrowser.auth.getSession();
+        const session = sessionData?.session;
+        if (!session?.access_token || !session.refresh_token) {
+          throw new Error("Auth session missing");
+        }
+
+        await updateTransactionPin(
+          hasPin ? currentPin : null,
+          newPin,
+          session.access_token,
+          session.refresh_token
+        );
         toast.success(hasPin ? "Transaction PIN updated successfully!" : "Transaction PIN set successfully!");
         router.push("/me");
-      } catch (err: any) {
-        toast.error(err.message ?? "Failed to update PIN");
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : "Failed to update PIN");
       }
     });
   };

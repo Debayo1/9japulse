@@ -1,5 +1,6 @@
 "use server";
 
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "./supabaseClient";
 import { createServerClient } from "./supabaseServer";
 import { ensureDbColumnsExist } from "./dbAdmin";
@@ -58,11 +59,27 @@ export async function updatePassword(newPassword: string) {
 }
 
 // ─── Update Transaction PIN ───────────────────────────────────────────────────
-export async function updateTransactionPin(currentPin: string | null, newPin: string) {
+export async function updateTransactionPin(
+  currentPin: string | null,
+  newPin: string,
+  accessTokenOverride?: string,
+  refreshTokenOverride?: string
+) {
   try {
     await ensureDbColumnsExist();
-    const { client, accessToken } = await createServerClient();
+    const { client, accessToken, refreshToken } = await createServerClient(
+      accessTokenOverride ?? null,
+      refreshTokenOverride ?? null
+    );
     if (!accessToken) throw new Error("Unauthorized");
+
+    if (refreshToken) {
+      const { error: sessionError } = await client.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+      if (sessionError) throw new Error(sessionError.message);
+    }
 
     const { data: { user }, error: userError } = await client.auth.getUser(accessToken);
     if (userError || !user) throw new Error("Unauthorized");
@@ -109,8 +126,8 @@ export async function updateTransactionPin(currentPin: string | null, newPin: st
     if (authError) throw new Error(authError.message);
 
     return { success: true };
-  } catch (err: any) {
-    throw new Error(err.message || "Failed to update transaction PIN");
+  } catch (err: unknown) {
+    throw new Error(err instanceof Error ? err.message : "Failed to update transaction PIN");
   }
 }
 
@@ -136,9 +153,48 @@ export async function getUser() {
   try {
     const { client, accessToken } = await createServerClient();
     if (!accessToken) return null;
-    const { data, error } = await client.auth.getUser(accessToken);
-    if (error) return null;
-    return data.user;
+
+    const fallbackUser = decodeUserFromJwt(accessToken);
+    try {
+      const { data, error } = await client.auth.getUser(accessToken);
+      if (!error && data.user) return data.user;
+    } catch (error) {
+      console.warn("[9jaPulse] Supabase auth lookup failed, falling back to cookie JWT:", error);
+    }
+
+    return fallbackUser;
+  } catch {
+    return null;
+  }
+}
+
+function decodeUserFromJwt(token: string): User | null {
+  const payload = parseJwtPayload(token);
+  if (!payload?.sub) return null;
+
+  return {
+    id: payload.sub,
+    aud: typeof payload.aud === "string" ? payload.aud : "authenticated",
+    role: typeof payload.role === "string" ? payload.role : "authenticated",
+    email: typeof payload.email === "string" ? payload.email : null,
+    phone: typeof payload.phone === "string" ? payload.phone : null,
+    created_at: new Date((typeof payload.iat === "number" ? payload.iat : 0) * 1000).toISOString(),
+    updated_at: new Date((typeof payload.iat === "number" ? payload.iat : 0) * 1000).toISOString(),
+    last_sign_in_at: null,
+    app_metadata: (payload.app_metadata as Record<string, unknown>) ?? {},
+    user_metadata: (payload.user_metadata as Record<string, unknown>) ?? {},
+    identities: [],
+  } as unknown as User;
+}
+
+function parseJwtPayload(token: string): Record<string, unknown> | null {
+  const [, payload] = token.split(".");
+  if (!payload) return null;
+
+  try {
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    return JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as Record<string, unknown>;
   } catch {
     return null;
   }

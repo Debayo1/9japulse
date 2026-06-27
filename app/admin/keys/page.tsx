@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Wrench, Database, Key, CheckCircle, Warning, ArrowsClockwise } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import Header from "@/components/Header";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import {
   testDatabaseConnection,
   runFullMigration,
@@ -13,6 +15,7 @@ import {
 } from "@/lib/dbAdmin";
 
 export default function AdminKeysPage() {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [dbUrl, setDbUrl] = useState("");
   const [keys, setKeys] = useState<ProviderKeyRow[]>([]);
@@ -41,9 +44,15 @@ export default function AdminKeysPage() {
   };
 
   useEffect(() => {
-    // Attempt load keys on mount (using server environment variables)
-    loadKeys(true);
-  }, []);
+    supabaseBrowser.auth.getSession().then(({ data }) => {
+      const role = String(data.session?.user?.user_metadata?.role ?? data.session?.user?.app_metadata?.role ?? "").toLowerCase();
+      if (!data.session || role !== "admin") {
+        router.replace("/home");
+        return;
+      }
+      loadKeys(true);
+    });
+  }, [router]);
 
   const handleTestConnection = () => {
     startTransition(async () => {

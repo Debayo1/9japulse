@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeSlash, ArrowCircleDown, ArrowCircleUp, Copy, ClockCounterClockwise } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { Bank, Eye, EyeSlash, PlusCircle } from "@phosphor-icons/react";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 interface WalletCardProps {
@@ -20,6 +19,33 @@ const fmt = (n: number) =>
     minimumFractionDigits: 2,
   }).format(n);
 
+function StatPill({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div
+      style={{
+        flex: 1,
+        minWidth: 0,
+        padding: "0.8rem 0.9rem",
+        borderRadius: 18,
+        background: "color-mix(in srgb, var(--bg-base) 72%, transparent)",
+      }}
+    >
+      <p style={{ fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
+        {label}
+      </p>
+      <p style={{ fontSize: "0.92rem", fontWeight: 800, color: "var(--text-primary)", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
 export default function WalletCard({
   walletId,
   balanceTotal,
@@ -28,20 +54,10 @@ export default function WalletCard({
 }: WalletCardProps) {
   const router = useRouter();
   const [hidden, setHidden] = useState(false);
-  const [activeSlide, setActiveSlide] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
-
   const [balances, setBalances] = useState({
     total: balanceTotal,
     withdrawable: balanceWithdrawable,
   });
-
-  useEffect(() => {
-    setBalances({
-      total: balanceTotal,
-      withdrawable: balanceWithdrawable,
-    });
-  }, [balanceTotal, balanceWithdrawable]);
 
   useEffect(() => {
     const channel = supabaseBrowser
@@ -55,12 +71,11 @@ export default function WalletCard({
           filter: `id=eq.${walletId}`,
         },
         (payload) => {
-          if (payload.new) {
-            setBalances({
-              total: Number(payload.new.balance_total),
-              withdrawable: Number(payload.new.balance_withdrawable),
-            });
-          }
+          if (!payload.new) return;
+          setBalances({
+            total: Number(payload.new.balance_total),
+            withdrawable: Number(payload.new.balance_withdrawable),
+          });
         }
       )
       .subscribe();
@@ -70,238 +85,106 @@ export default function WalletCard({
     };
   }, [walletId]);
 
-  const lockedBalance = balances.total - balances.withdrawable;
-
-  const toggleHidden = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setHidden((h) => !h);
-  };
-
-  const copyAccount = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText("9070578999");
-    toast.success("Virtual account number copied!");
-  };
-
-  const handleScroll = () => {
-    if (!containerRef.current) return;
-    const container = containerRef.current;
-    const width = container.clientWidth;
-    const scrollLeft = container.scrollLeft;
-    const active = Math.round(scrollLeft / width);
-    if (active !== activeSlide && active >= 0 && active <= 2) {
-      setActiveSlide(active);
-    }
-  };
+  const lockedBalance = Math.max(0, balances.total - balances.withdrawable);
+  const firstName = userName.split(" ")[0] || "User";
 
   return (
-    <div style={{ marginBottom: "1.5rem" }}>
-      {/* ─── Swiping Cards ViewPager ────────────────────────────────────── */}
+    <section
+      className="animate-slide-up"
+      style={{
+        marginBottom: "1.1rem",
+        borderRadius: 28,
+        padding: "1.2rem",
+        background: "linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 12%, var(--bg-elevated)), color-mix(in srgb, var(--bg-elevated) 90%, var(--color-accent) 10%))",
+        boxShadow: "0 18px 40px -24px rgba(15, 23, 42, 0.28)",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
       <div
-        ref={containerRef}
-        onScroll={handleScroll}
-        className="viewpager-container"
+        aria-hidden="true"
         style={{
-          paddingBottom: "1.25rem",
+          position: "absolute",
+          inset: 0,
+          background: "radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 38%), radial-gradient(circle at left bottom, rgba(255,255,255,0.08), transparent 30%)",
+          pointerEvents: "none",
         }}
-      >
-        {/* Slide 1: Total Balance Card */}
-        <div
-          className="viewpager-slide wallet-slide-total"
-          style={{
-            padding: "1.25rem",
-            position: "relative",
-            minHeight: "115px",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "space-between",
-            borderRadius: "20px",
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
-          }}
-        >
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <span style={{ fontSize: "0.8125rem", fontWeight: 600, opacity: 0.9 }}>
-                Hi, {userName.split(" ")[0]}
-              </span>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
-                <div
-                  onClick={copyAccount}
-                  className="bank-pill"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                    background: "rgba(0, 0, 0, 0.05)",
-                    padding: "3px 8px",
-                    borderRadius: "10px",
-                    fontSize: "0.625rem",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    transition: "all var(--duration-fast)",
-                    border: "1px solid rgba(0, 0, 0, 0.04)",
-                    color: "inherit",
-                  }}
-                >
-                  <span>9jaPulse MFB • 9070578999</span>
-                  <Copy size={11} weight="regular" />
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toast.info("Funding virtual accounts created in dashboard");
-                  }}
-                  style={{
-                    background: "var(--color-primary)",
-                    color: "#ffffff",
-                    border: "none",
-                    padding: "3px 8px",
-                    borderRadius: "8px",
-                    fontSize: "0.625rem",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "3px",
-                    boxShadow: "0 2px 6px hsl(243 75% 58% / 0.15)",
-                  }}
-                >
-                  <ArrowCircleDown size={12} weight="fill" />
-                  Add Money
-                </button>
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1rem" }}>
-              <p style={{ fontSize: "1.75rem", fontWeight: 800, letterSpacing: "-0.02em", color: "inherit", margin: 0, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
-                {hidden ? "₦ ••••••" : fmt(balances.total)}
-              </p>
-              <button
-                onClick={toggleHidden}
-                style={{ padding: "4px", background: "transparent", border: "none", color: "inherit", cursor: "pointer", opacity: 0.8, display: "flex", alignItems: "center", justifyContent: "center" }}
-                aria-label={hidden ? "Show balance" : "Hide balance"}
-              >
-                {hidden ? <Eye size={20} weight="fill" /> : <EyeSlash size={20} weight="regular" />}
-              </button>
-            </div>
-          </div>
-        </div>
+      />
 
-        {/* Slide 2: Withdrawable Cash Card */}
-        <div
-          className="viewpager-slide wallet-slide-withdrawable"
-          style={{
-            padding: "1.25rem",
-            position: "relative",
-            minHeight: "115px",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "space-between",
-            borderRadius: "20px",
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
-          }}
-        >
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: "0.8125rem", fontWeight: 600, opacity: 0.9 }}>
-                Hi, {userName.split(" ")[0]}
-              </span>
-              <span style={{ fontSize: "0.6875rem", fontWeight: 700, opacity: 0.75, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                Withdrawable Cash
-              </span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", marginTop: "1rem" }}>
-              <p style={{ fontSize: "1.75rem", fontWeight: 800, letterSpacing: "-0.02em", color: "inherit", margin: 0, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
-                {hidden ? "₦ ••••••" : fmt(balances.withdrawable)}
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", marginBottom: "1rem" }}>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "0.25rem" }}>
+              Hi, {firstName}
+            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <Bank size={18} weight="duotone" color="var(--color-primary)" />
+              <p style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
+                Wallet Balance
               </p>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setHidden((value) => !value)}
+            aria-label={hidden ? "Show balance" : "Hide balance"}
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: "50%",
+              border: "none",
+              background: "color-mix(in srgb, var(--bg-base) 70%, transparent)",
+              color: "var(--text-primary)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+            }}
+          >
+            {hidden ? <Eye size={17} weight="fill" /> : <EyeSlash size={17} weight="regular" />}
+          </button>
         </div>
 
-        {/* Slide 3: Locked Funds Card */}
-        <div
-          className="viewpager-slide wallet-slide-locked"
-          style={{
-            padding: "1.25rem",
-            position: "relative",
-            minHeight: "115px",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "space-between",
-            borderRadius: "20px",
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
-          }}
-        >
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: "0.8125rem", fontWeight: 600, opacity: 0.9 }}>
-                Hi, {userName.split(" ")[0]}
-              </span>
-              <span style={{ fontSize: "0.6875rem", fontWeight: 700, opacity: 0.75, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                Locked Funds
-              </span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", marginTop: "1rem" }}>
-              <p style={{ fontSize: "1.75rem", fontWeight: 800, letterSpacing: "-0.02em", color: "inherit", margin: 0, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
-                {hidden ? "₦ ••••••" : fmt(lockedBalance)}
-              </p>
-            </div>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "1rem", marginBottom: "1rem" }}>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: "0.35rem" }}>
+              Total Balance
+            </p>
+            <h1 style={{ fontSize: "2rem", lineHeight: 1, margin: 0, fontWeight: 900, letterSpacing: "-0.04em", color: "var(--text-primary)" }}>
+              {hidden ? "••••••••" : fmt(balances.total)}
+            </h1>
           </div>
+
+          <button
+            type="button"
+            onClick={() => router.push("/deposit")}
+            style={{
+              flexShrink: 0,
+              border: "none",
+              borderRadius: 999,
+              padding: "0.65rem 0.95rem",
+              background: "var(--color-primary)",
+              color: "#fff",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              fontSize: "0.78rem",
+              fontWeight: 800,
+              cursor: "pointer",
+              boxShadow: "0 10px 22px -14px rgba(79, 70, 229, 0.8)",
+            }}
+          >
+            <PlusCircle size={16} weight="fill" />
+            Deposit
+          </button>
+        </div>
+
+        <div style={{ display: "flex", gap: "0.7rem" }}>
+          <StatPill label="Withdrawable" value={hidden ? "••••••" : fmt(balances.withdrawable)} />
+          <StatPill label="Locked" value={hidden ? "••••••" : fmt(lockedBalance)} />
         </div>
       </div>
-
-      {/* ─── Pagination Dots ────────────────────────────────────────────── */}
-      <div className="dots-container" style={{ marginBottom: "1.25rem" }}>
-        {[0, 1, 2].map((idx) => (
-          <div
-            key={idx}
-            className={`dot${activeSlide === idx ? " active" : ""}`}
-          />
-        ))}
-      </div>
-
-      {/* ─── Contextual Action Buttons ──────────────────────────────────── */}
-      <div style={{ minHeight: "44px" }}>
-        {(activeSlide === 0 || activeSlide === 1) && (
-          <div style={{ display: "flex", gap: "0.75rem" }} className="animate-fade-in">
-            <button
-              className="btn btn-wallet-action"
-              style={{
-                flex: 1,
-                fontSize: "0.875rem",
-                height: "44px",
-                borderRadius: "22px",
-              }}
-              onClick={() => toast.info("Transfers feature coming soon")}
-            >
-              <ArrowCircleUp size={18} weight="fill" />
-              Transfer
-            </button>
-            <button
-              className="btn btn-wallet-action"
-              style={{
-                flex: 1,
-                fontSize: "0.875rem",
-                height: "44px",
-                borderRadius: "22px",
-              }}
-              onClick={() => router.push("/history")}
-            >
-              <ClockCounterClockwise size={18} weight="fill" />
-              History
-            </button>
-          </div>
-        )}
-
-        {activeSlide === 2 && (
-          <div className="animate-fade-in" style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", textAlign: "center", padding: "10px 1rem", border: "1.5px solid var(--border)", borderRadius: "14px", background: "var(--bg-surface)", opacity: 0.85 }}>
-            Locked funds are managed by the system for pending transactions and admin holds.
-          </div>
-        )}
-      </div>
-    </div>
+    </section>
   );
 }
-

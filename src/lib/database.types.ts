@@ -18,6 +18,7 @@ export type ProfileRow = {
   full_name: string | null;
   phone: string | null;
   pin: string | null;
+  role: string | null;
   avatar_url: string | null;
   referral_code: string | null;
   referred_by: string | null;
@@ -56,6 +57,45 @@ export type ProviderKeyRow = {
   created_at: string;
 };
 
+export type VirtualAccountRow = {
+  id: string;
+  user_id: string;
+  provider: string;
+  provider_reference: string | null;
+  account_number: string;
+  account_name: string;
+  bank_code: string | null;
+  bank_name: string | null;
+  account_type: string | null;
+  status: string;
+  webhook_url: string | null;
+  meta: Json | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PlatformSettingRow = {
+  id: number;
+  app_name: string;
+  primary_color: string | null;
+  secondary_color: string | null;
+  accent_color: string | null;
+  extra_color: string | null;
+  transfer_fee: number;
+  bank_transfer_fee: number;
+  deposit_fee: number;
+  referral_percentage: number;
+  cashback_percentage: number | null;
+  ncwallet_api_url: string | null;
+  ncwallet_authorization: string | null;
+  app_maintenance: boolean | null;
+  theme: string | null;
+  banner_enabled: boolean | null;
+  banner_text: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export interface Database {
   public: {
     Tables: {
@@ -78,6 +118,16 @@ export interface Database {
         Row: ProviderKeyRow;
         Insert: Omit<ProviderKeyRow, "id" | "created_at">;
         Update: Partial<Omit<ProviderKeyRow, "id" | "created_at">>;
+      };
+      virtual_accounts: {
+        Row: VirtualAccountRow;
+        Insert: Omit<VirtualAccountRow, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<VirtualAccountRow, "id" | "created_at" | "updated_at">>;
+      };
+      platform_settings: {
+        Row: PlatformSettingRow;
+        Insert: Omit<PlatformSettingRow, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<PlatformSettingRow, "id" | "created_at" | "updated_at">>;
       };
     };
     Views: Record<string, never>;

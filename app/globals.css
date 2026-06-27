@@ -121,10 +121,10 @@ p  { line-height: 1.6; color: var(--text-secondary); }
 
 /* ─── Card & Glassmorphism ──────────────────────────────────────── */
 .card {
-  background: var(--bg-elevated);
-  border: 1.5px solid var(--border);
-  border-radius: 20px;
-  padding: 1.25rem 1.25rem;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-elevated) 96%, white 4%), var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+  border-radius: 22px;
+  padding: 1.125rem 1.125rem;
   box-shadow: var(--shadow-card);
   transition: transform var(--duration-normal) var(--ease-smooth),
               box-shadow var(--duration-normal) var(--ease-smooth),
@@ -136,16 +136,18 @@ p  { line-height: 1.6; color: var(--text-secondary); }
   background: var(--bg-glass);
   backdrop-filter: blur(18px) saturate(180%);
   -webkit-backdrop-filter: blur(18px) saturate(180%);
-  border: 1.5px solid var(--border-glass);
+  border: 1px solid color-mix(in srgb, var(--border-glass) 55%, transparent);
   border-radius: 24px;
+  box-shadow: var(--shadow-card);
 }
 
 .glass-sm {
   background: var(--bg-glass);
   backdrop-filter: blur(10px) saturate(150%);
   -webkit-backdrop-filter: blur(10px) saturate(150%);
-  border: 1px solid var(--border-glass);
+  border: 1px solid color-mix(in srgb, var(--border-glass) 45%, transparent);
   border-radius: 14px;
+  box-shadow: var(--shadow-card);
 }
 
 /* ─── Squishy Buttons ───────────────────────────────────────────── */
@@ -193,7 +195,7 @@ p  { line-height: 1.6; color: var(--text-secondary); }
 .btn-secondary {
   background: var(--bg-surface);
   color: var(--text-primary);
-  border: 1.5px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
 }
 
 .btn-secondary:hover:not(:disabled) {
@@ -221,7 +223,7 @@ p  { line-height: 1.6; color: var(--text-secondary); }
 .input {
   width: 100%;
   background: var(--bg-elevated);
-  border: 1.5px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
   border-radius: 16px;
   color: var(--text-primary);
   font-size: 0.9375rem;
@@ -239,7 +241,7 @@ p  { line-height: 1.6; color: var(--text-secondary); }
 
 .input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 4px hsl(243 75% 58% / 0.08);
+  box-shadow: 0 0 0 3px hsl(243 75% 58% / 0.07);
   transform: scale(1.005);
 }
 
@@ -522,5 +524,4 @@ p  { line-height: 1.6; color: var(--text-secondary); }
 .nav-item-center.active::after {
   display: none !important;
 }
-
 

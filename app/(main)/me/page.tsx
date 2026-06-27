@@ -8,7 +8,7 @@ import Link from "next/link";
 const MENU_ITEMS = [
   { label: "Account Settings",    Icon: Gear,         href: "/me/settings"   },
   { label: "Security & Privacy",  Icon: ShieldCheck,  href: "/me/security"   },
-  { label: "Admin Panel (DB & Keys)", Icon: Wrench,   href: "/admin/keys"    },
+  { label: "Admin Dashboard",     Icon: Wrench,       href: "/admin"         },
   { label: "Notifications",       Icon: Bell,         href: "/me/notifs"     },
   { label: "Refer & Earn",        Icon: ShareNetwork, href: "/me/referral"   },
   { label: "Help & Support",      Icon: Question,     href: "/me/support"    },

@@ -10,6 +10,7 @@ import {
 } from "@phosphor-icons/react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { applyThemePreference, getStoredThemePreference, resolveTheme } from "@/lib/theme";
 
 interface HeaderProps {
   title?: string;
@@ -33,21 +34,30 @@ export default function Header({
   userName = "User",
 }: HeaderProps) {
   const router = useRouter();
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return resolveTheme(getStoredThemePreference()) === "dark";
+  });
 
   useEffect(() => {
-    const isDark = document.documentElement.classList.contains("dark");
-    setDark(isDark);
+    const onThemeChange = () => {
+      const pref = getStoredThemePreference();
+      setDark(resolveTheme(pref) === "dark");
+    };
+
+    window.addEventListener("storage", onThemeChange);
+    document.addEventListener("9japulse-theme-change", onThemeChange);
+
+    return () => {
+      window.removeEventListener("storage", onThemeChange);
+      document.removeEventListener("9japulse-theme-change", onThemeChange);
+    };
   }, []);
 
   const toggleTheme = () => {
-    const nextDark = !dark;
-    setDark(nextDark);
-    if (nextDark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
+    const nextPref = dark ? "light" : "dark";
+    const resolved = applyThemePreference(nextPref);
+    setDark(resolved === "dark");
   };
 
   return (

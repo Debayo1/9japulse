@@ -1,26 +1,6 @@
 "use server";
 
-import { createServiceClient } from "../supabaseServer";
-import { ensureDbColumnsExist } from "../dbAdmin";
-
-// ─── Fetch GSubz API key from provider_keys table ──────────────────────────────
-async function getGSubzApiKey(): Promise<string> {
-  await ensureDbColumnsExist();
-
-  const svc = createServiceClient();
-  const { data, error } = await (svc as any)
-    .from("provider_keys")
-    .select("key_value")
-    .eq("provider", "gsubz")
-    .eq("key_name", "api_key")
-    .eq("is_active", true)
-    .single();
-
-  if (error || !data) {
-    throw new Error("Missing or inactive GSubz API key in provider_keys table.");
-  }
-  return data.key_value;
-}
+import { getProviderKey } from "../providerKeys";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface GSubzAirtimeParams {
@@ -62,8 +42,20 @@ export interface PurchaseResult {
 }
 
 // ─── Unified GSubz HTTP Call (matches PHP implementation exactly) ───────────────
-async function callGSubzApi(payload: Record<string, any>): Promise<any> {
-  const apiKey = await getGSubzApiKey();
+type GSubzResponse = {
+  status?: string;
+  transactionID?: string;
+  ident?: string;
+  description?: string;
+  error?: string;
+  token?: string;
+  message?: string;
+  data?: unknown;
+  ref_id?: string;
+};
+
+async function callGSubzApi(payload: Record<string, string | number | boolean | null | undefined>): Promise<GSubzResponse> {
+  const apiKey = await getProviderKey("gsubz", "api_key");
   const url = "https://gsubz.com/api/pay/";
 
   // GSubz expects the API key in both Authorization header and POST body
@@ -88,7 +80,7 @@ async function callGSubzApi(payload: Record<string, any>): Promise<any> {
     throw new Error(`GSubz API connection failed with status code ${res.status}`);
   }
 
-  return await res.json();
+  return (await res.json()) as GSubzResponse;
 }
 
 // ─── Airtime ──────────────────────────────────────────────────────────────────
@@ -111,11 +103,11 @@ export async function gsubzPurchaseAirtime(
       reference: json.transactionID || json.ident || params.requestID,
       message: json.description || json.error || "Transaction processed",
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
       success: false,
       reference: "",
-      message: err.message || "GSubz API connection error",
+      message: err instanceof Error ? err.message : "GSubz API connection error",
     };
   }
 }
@@ -141,11 +133,11 @@ export async function gsubzPurchaseData(
       reference: json.transactionID || json.ident || params.requestID,
       message: json.description || json.error || "Transaction processed",
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
       success: false,
       reference: "",
-      message: err.message || "GSubz API connection error",
+      message: err instanceof Error ? err.message : "GSubz API connection error",
     };
   }
 }
@@ -172,11 +164,11 @@ export async function gsubzBuyElectricity(
       message: json.description || json.error || "Transaction processed",
       token: json.token,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
       success: false,
       reference: "",
-      message: err.message || "GSubz API connection error",
+      message: err instanceof Error ? err.message : "GSubz API connection error",
     };
   }
 }
@@ -203,11 +195,11 @@ export async function gsubzRenewCableTV(
       reference: json.transactionID || json.ident || params.requestID,
       message: json.description || json.error || "Transaction processed",
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
       success: false,
       reference: "",
-      message: err.message || "GSubz API connection error",
+      message: err instanceof Error ? err.message : "GSubz API connection error",
     };
   }
 }

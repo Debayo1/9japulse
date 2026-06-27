@@ -22,11 +22,34 @@ create table if not exists profiles (
   full_name      text,
   phone          text,
   pin            text,
+  role           text        not null default 'user',
   avatar_url     text,
   referral_code  text        unique default upper(substr(gen_random_uuid()::text, 1, 8)),
   referred_by    uuid        references profiles(id),
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
+);
+
+create table if not exists platform_settings (
+  id                  bigserial   primary key,
+  app_name            text        not null default '9jaPulse',
+  primary_color       text,
+  secondary_color     text,
+  accent_color        text,
+  extra_color         text,
+  transfer_fee        numeric(12,2) not null default 0,
+  bank_transfer_fee   numeric(12,2) not null default 0,
+  deposit_fee         numeric(12,2) not null default 50,
+  referral_percentage  numeric(5,2) not null default 10,
+  cashback_percentage  numeric(5,2) not null default 0,
+  ncwallet_api_url    text,
+  ncwallet_authorization text,
+  app_maintenance     boolean     not null default false,
+  theme               text        not null default 'system',
+  banner_enabled      boolean     not null default true,
+  banner_text         text,
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz not null default now()
 );
 
 -- ─── wallets ───────────────────────────────────────────────────────────────────
@@ -71,6 +94,23 @@ create table if not exists provider_keys (
   unique (provider, key_name)
 );
 
+create table if not exists virtual_accounts (
+  id                uuid        primary key default gen_random_uuid(),
+  user_id           uuid        not null unique references auth.users(id) on delete cascade,
+  provider          text        not null default 'ncwallet',
+  provider_reference text       unique,
+  account_number    text        not null unique,
+  account_name      text        not null,
+  bank_code         text,
+  bank_name         text,
+  account_type      text,
+  status            text        not null default 'active',
+  webhook_url       text,
+  meta              jsonb,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+
 -- ─── Auto-create wallet + profile on new user signup ──────────────────────────
 create or replace function public.handle_new_user()
 returns trigger as $$
@@ -113,4 +153,12 @@ create trigger set_profiles_updated_at
 
 create trigger set_wallets_updated_at
   before update on wallets
+  for each row execute procedure set_updated_at();
+
+create trigger set_platform_settings_updated_at
+  before update on platform_settings
+  for each row execute procedure set_updated_at();
+
+create trigger set_virtual_accounts_updated_at
+  before update on virtual_accounts
   for each row execute procedure set_updated_at();

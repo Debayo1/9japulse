@@ -31,9 +31,40 @@ export async function ensureDbColumnsExist(): Promise<void> {
     await client.query(`
       ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS pin text;
       ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS passcode text;
+      ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'user';
     `);
 
-    // 2. Ensure provider_keys table exists so key operations don't crash
+    // 2. Ensure platform settings table exists
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public.platform_settings (
+        id bigserial PRIMARY KEY,
+        app_name text NOT NULL DEFAULT '9jaPulse',
+        primary_color text,
+        secondary_color text,
+        accent_color text,
+        extra_color text,
+        transfer_fee numeric(12,2) NOT NULL DEFAULT 0,
+        bank_transfer_fee numeric(12,2) NOT NULL DEFAULT 0,
+        deposit_fee numeric(12,2) NOT NULL DEFAULT 50,
+        referral_percentage numeric(5,2) NOT NULL DEFAULT 10,
+        cashback_percentage numeric(5,2) NOT NULL DEFAULT 0,
+        ncwallet_api_url text,
+        ncwallet_authorization text,
+        app_maintenance boolean NOT NULL DEFAULT false,
+        theme text NOT NULL DEFAULT 'system',
+        banner_enabled boolean NOT NULL DEFAULT true,
+        banner_text text,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+    await client.query(`
+      INSERT INTO public.platform_settings (app_name)
+      SELECT '9jaPulse'
+      WHERE NOT EXISTS (SELECT 1 FROM public.platform_settings);
+    `);
+
+    // 3. Ensure provider_keys table exists so key operations don't crash
     await client.query(`
       CREATE TABLE IF NOT EXISTS public.provider_keys (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -46,10 +77,30 @@ export async function ensureDbColumnsExist(): Promise<void> {
       );
     `);
 
+    // 4. Ensure virtual_accounts table exists for deposit flows
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public.virtual_accounts (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id uuid NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+        provider text NOT NULL DEFAULT 'ncwallet',
+        provider_reference text UNIQUE,
+        account_number text NOT NULL UNIQUE,
+        account_name text NOT NULL,
+        bank_code text,
+        bank_name text,
+        account_type text,
+        status text NOT NULL DEFAULT 'active',
+        webhook_url text,
+        meta jsonb,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+
     isDbVerified = true;
     console.log("[9jaPulse] Database self-healing schema checks verified successfully.");
-  } catch (err: any) {
-    console.error("[9jaPulse] Automatic database self-healing checks failed:", err.message || err);
+  } catch (err: unknown) {
+    console.error("[9jaPulse] Automatic database self-healing checks failed:", err instanceof Error ? err.message : err);
   } finally {
     try {
       await client.end();
@@ -67,8 +118,8 @@ export async function testDatabaseConnection(dbUrl: string) {
     await client.connect();
     await client.query("SELECT 1");
     return { success: true, message: "Connected to database successfully!" };
-  } catch (err: any) {
-    throw new Error(err.message || "Connection failed");
+  } catch (err: unknown) {
+    throw new Error(err instanceof Error ? err.message : "Connection failed");
   } finally {
     try {
       await client.end();
@@ -102,11 +153,11 @@ export async function runFullMigration(dbUrl: string) {
     isDbVerified = true;
     
     return { success: true, message: "Schema migrations applied successfully!" };
-  } catch (err: any) {
+  } catch (err: unknown) {
     try {
       await client.query("ROLLBACK;");
     } catch {}
-    throw new Error(err.message || "Failed to execute database migration");
+    throw new Error(err instanceof Error ? err.message : "Failed to execute database migration");
   } finally {
     try {
       await client.end();
@@ -152,8 +203,8 @@ export async function getProviderKeysAdmin(dbUrl: string): Promise<ProviderKeyRo
       is_active: row.is_active,
       created_at: row.created_at ? new Date(row.created_at).toISOString() : "",
     }));
-  } catch (err: any) {
-    throw new Error(err.message || "Failed to query provider keys");
+  } catch (err: unknown) {
+    throw new Error(err instanceof Error ? err.message : "Failed to query provider keys");
   } finally {
     try {
       await client.end();
@@ -184,8 +235,8 @@ export async function saveProviderKeyAdmin(
     `, [provider.toLowerCase().trim(), keyName.toLowerCase().trim(), keyValue.trim()]);
     
     return { success: true };
-  } catch (err: any) {
-    throw new Error(err.message || "Failed to update provider key");
+  } catch (err: unknown) {
+    throw new Error(err instanceof Error ? err.message : "Failed to update provider key");
   } finally {
     try {
       await client.end();
