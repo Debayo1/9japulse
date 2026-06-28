@@ -102,3 +102,102 @@ export async function promoteUserToAdmin(email: string): Promise<{ success: bool
     };
   }
 }
+
+export async function updatePlatformSettingsAdminAction(settings: {
+  app_name: string;
+  deposit_fee: number;
+  transfer_fee: number;
+  bank_transfer_fee: number;
+  app_maintenance: boolean;
+  banner_text: string;
+}): Promise<{ success: boolean; message: string }> {
+  try {
+    const caller = await getUser();
+    if (!caller || !(await isAdminUser(caller))) throw new Error("Unauthorized");
+
+    const svc = createServiceClient() as any;
+    
+    const { data: existing } = await svc
+      .from("platform_settings")
+      .select("id")
+      .maybeSingle();
+
+    let err;
+    if (existing) {
+      const { error } = await svc
+        .from("platform_settings")
+        .update({
+          app_name: settings.app_name,
+          deposit_fee: Number(settings.deposit_fee),
+          transfer_fee: Number(settings.transfer_fee),
+          bank_transfer_fee: Number(settings.bank_transfer_fee),
+          app_maintenance: Boolean(settings.app_maintenance),
+          banner_text: settings.banner_text,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", existing.id);
+      err = error;
+    } else {
+      const { error } = await svc
+        .from("platform_settings")
+        .insert({
+          app_name: settings.app_name,
+          deposit_fee: Number(settings.deposit_fee),
+          transfer_fee: Number(settings.transfer_fee),
+          bank_transfer_fee: Number(settings.bank_transfer_fee),
+          app_maintenance: Boolean(settings.app_maintenance),
+          banner_text: settings.banner_text
+        });
+      err = error;
+    }
+
+    if (err) throw new Error(err.message);
+    return { success: true, message: "Platform settings updated successfully!" };
+  } catch (err: any) {
+    return { success: false, message: err.message || "Failed to update settings" };
+  }
+}
+
+export async function updateUserBalanceAdminAction(
+  userId: string,
+  newBalance: number
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const caller = await getUser();
+    if (!caller || !(await isAdminUser(caller))) throw new Error("Unauthorized");
+
+    const svc = createServiceClient() as any;
+
+    const { error } = await svc
+      .from("wallets")
+      .update({ balance_withdrawable: Number(newBalance), updated_at: new Date().toISOString() })
+      .eq("user_id", userId);
+
+    if (error) throw new Error(error.message);
+    return { success: true, message: "User balance updated successfully!" };
+  } catch (err: any) {
+    return { success: false, message: err.message || "Failed to update user balance" };
+  }
+}
+
+export async function updateTransactionStatusAdminAction(
+  txnId: string,
+  status: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const caller = await getUser();
+    if (!caller || !(await isAdminUser(caller))) throw new Error("Unauthorized");
+
+    const svc = createServiceClient() as any;
+
+    const { error } = await svc
+      .from("transactions")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", txnId);
+
+    if (error) throw new Error(error.message);
+    return { success: true, message: `Transaction status changed to ${status}!` };
+  } catch (err: any) {
+    return { success: false, message: err.message || "Failed to update transaction status" };
+  }
+}
