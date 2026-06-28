@@ -36,6 +36,29 @@ export default function SuccessPage() {
 
   const networkName = NETWORK_LABELS[network.toLowerCase()] || network;
 
+  const fallbackCopyText = (text: string) => {
+    try {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.position = "fixed";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand("copy");
+      document.body.removeChild(textArea);
+      if (successful) {
+        toast.success("Receipt details copied to clipboard!");
+      } else {
+        throw new Error("Copy command failed");
+      }
+    } catch (err) {
+      console.error("Fallback copy failed:", err);
+      toast.error("Failed to copy receipt. Please copy manually.");
+    }
+  };
+
   const handleShare = () => {
     const text = `9jaPulse Transaction Receipt\n-------------------------\nType: ${type.toUpperCase()}\nAmount: ${formattedAmount}\nStatus: Successful\nPhone: ${phone}\nNetwork: ${networkName}\n${plan ? `Plan: ${plan}\n` : ""}Ref: ${ref}\nDate: ${dateStr}\nThank you for using 9jaPulse!`;
     if (navigator.share) {
@@ -43,9 +66,16 @@ export default function SuccessPage() {
         title: "Transaction Receipt",
         text: text,
       }).catch(() => {});
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text)
+        .then(() => {
+          toast.success("Receipt details copied to clipboard!");
+        })
+        .catch(() => {
+          fallbackCopyText(text);
+        });
     } else {
-      navigator.clipboard.writeText(text);
-      toast.success("Receipt details copied to clipboard!");
+      fallbackCopyText(text);
     }
   };
 
