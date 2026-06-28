@@ -2,6 +2,7 @@
 
 import { createServiceClient } from "./supabaseServer";
 import { ensureDbColumnsExist } from "./dbAdmin";
+import { getProviderKey } from "./providerKeys";
 import { ncwalletCreateVirtualAccount } from "./providers/ncwallet";
 import type { Database } from "./database.types";
 
@@ -50,10 +51,17 @@ export async function getOrCreateVirtualAccount(userId: string) {
   const accountName = profile?.full_name || profile?.email || "9jaPulse User";
   const email = profile?.email || "";
   const phoneNumber = profile?.phone || "";
-  const bvn = process.env.NCWALLET_BVN ?? "";
+  let bvn = process.env.NCWALLET_BVN ?? "";
+  if (!bvn) {
+    try {
+      bvn = await getProviderKey("ncwallet", "bvn");
+    } catch {
+      bvn = "";
+    }
+  }
 
   if (!bvn) {
-    throw new Error("NCWallet BVN is missing. Set NCWALLET_BVN in .env.local or save it as provider key.");
+    throw new Error("NCWallet BVN is missing. Please set NCWALLET_BVN in your environment or configure the 'bvn' key for 'ncwallet' in the Admin settings.");
   }
 
   const created = await ncwalletCreateVirtualAccount({
