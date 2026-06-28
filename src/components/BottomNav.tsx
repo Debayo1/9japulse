@@ -19,7 +19,9 @@ const NAV_ITEMS = [
 export default function BottomNav() {
   const pathname = usePathname();
 
-  if (pathname.startsWith("/services/")) return null;
+  // Show bottom navigation ONLY on main shell pages
+  const showNav = pathname === "/home" || pathname === "/services" || pathname === "/card" || pathname === "/me";
+  if (!showNav) return null;
 
   return (
     <nav className="bottom-nav" aria-label="Main navigation">
