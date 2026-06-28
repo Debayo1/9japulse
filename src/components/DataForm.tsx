@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Header from "./Header";
+import Image from "next/image";
 import { Info, WifiHigh } from "@phosphor-icons/react";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
@@ -185,20 +186,32 @@ export default function DataForm({ walletId, initialWithdrawable }: DataFormProp
                     setPlanIndex(0);
                   }}
                   style={{
-                    backgroundColor: active ? net.color : "var(--bg-elevated)",
-                    color: active ? net.textColor : "var(--text-primary)",
-                    border: active ? `1.5px solid ${net.color}` : "1.5px solid var(--border)",
-                    height: "48px",
-                    borderRadius: "14px",
-                    fontWeight: 800,
-                    fontSize: "0.8125rem",
+                    backgroundColor: active ? "var(--bg-elevated)" : "var(--bg-surface)",
+                    color: "var(--text-primary)",
+                    border: active ? `2px solid var(--color-primary)` : "1.5px solid var(--border)",
+                    height: "72px",
+                    borderRadius: "16px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
                     cursor: "pointer",
                     transition: "all var(--duration-fast) var(--ease-smooth)",
-                    boxShadow: active ? `0 6px 16px ${net.color}33` : "none",
+                    boxShadow: active ? `0 6px 16px rgba(0, 0, 0, 0.04)` : "none",
                   }}
                   className="squishy"
                 >
-                  {net.label}
+                  <Image
+                    src={`/networks/${net.id}.png`}
+                    alt={net.label}
+                    width={28}
+                    height={28}
+                    style={{ borderRadius: "50%", objectFit: "cover" }}
+                  />
+                  <span style={{ fontSize: "0.6875rem", fontWeight: 700 }}>
+                    {net.label}
+                  </span>
                 </button>
               );
             })}
