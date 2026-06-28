@@ -195,38 +195,57 @@ export interface ProviderKeyRow {
  * Fetches all provider keys directly using pg.
  */
 export async function getProviderKeysAdmin(dbUrl: string): Promise<ProviderKeyRow[]> {
-  if (!dbUrl) throw new Error("Database URL is required");
-  const client = new Client({ connectionString: dbUrl });
-  try {
-    await client.connect();
-    // Auto-create table if missing before querying
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS public.provider_keys (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        provider text NOT NULL,
-        key_name text NOT NULL,
-        key_value text NOT NULL,
-        is_active boolean NOT NULL DEFAULT true,
-        created_at timestamptz NOT NULL DEFAULT now(),
-        UNIQUE (provider, key_name)
-      );
-    `);
-    const res = await client.query("SELECT * FROM public.provider_keys ORDER BY provider, key_name");
-    return res.rows.map(row => ({
-      id: row.id,
-      provider: row.provider,
-      key_name: row.key_name,
-      key_value: row.key_value,
-      is_active: row.is_active,
-      created_at: row.created_at ? new Date(row.created_at).toISOString() : "",
-    }));
-  } catch (err: unknown) {
-    throw new Error(err instanceof Error ? err.message : "Failed to query provider keys");
-  } finally {
+  const client = dbUrl ? new Client({ connectionString: dbUrl }) : null;
+  if (client) {
     try {
-      await client.end();
-    } catch {}
+      await client.connect();
+      // Auto-create table if missing before querying
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS public.provider_keys (
+          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          provider text NOT NULL,
+          key_name text NOT NULL,
+          key_value text NOT NULL,
+          is_active boolean NOT NULL DEFAULT true,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          UNIQUE (provider, key_name)
+        );
+      `);
+      const res = await client.query("SELECT * FROM public.provider_keys ORDER BY provider, key_name");
+      return res.rows.map(row => ({
+        id: row.id,
+        provider: row.provider,
+        key_name: row.key_name,
+        key_value: "••••••••",
+        is_active: row.is_active,
+        created_at: row.created_at ? new Date(row.created_at).toISOString() : "",
+      }));
+    } catch (err: unknown) {
+      console.warn("[9jaPulse] PG direct connection failed in getProviderKeysAdmin, trying HTTPS API fallback:", err);
+    } finally {
+      try {
+        await client.end();
+      } catch {}
+    }
   }
+
+  // Fallback to HTTPS API client
+  const svc = createServiceClient() as any;
+  const { data, error } = await svc
+    .from("provider_keys")
+    .select("*")
+    .order("provider", { ascending: true })
+    .order("key_name", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    provider: row.provider,
+    key_name: row.key_name,
+    key_value: "••••••••",
+    is_active: row.is_active,
+    created_at: row.created_at ? new Date(row.created_at).toISOString() : "",
+  }));
 }
 
 /**
@@ -238,27 +257,45 @@ export async function saveProviderKeyAdmin(
   keyName: string,
   keyValue: string
 ) {
-  if (!dbUrl) throw new Error("Database URL is required");
-  if (!provider || !keyName || !keyValue) throw new Error("All fields (provider, key name, key value) are required");
+  const provClean = provider.toLowerCase().trim();
+  const keyClean = keyName.toLowerCase().trim();
+  const valClean = keyValue.trim();
 
-  const client = new Client({ connectionString: dbUrl });
-  try {
-    await client.connect();
-    await client.query(`
-      INSERT INTO public.provider_keys (provider, key_name, key_value, is_active)
-      VALUES ($1, $2, $3, true)
-      ON CONFLICT (provider, key_name)
-      DO UPDATE SET key_value = EXCLUDED.key_value, is_active = true;
-    `, [provider.toLowerCase().trim(), keyName.toLowerCase().trim(), keyValue.trim()]);
-    
-    return { success: true };
-  } catch (err: unknown) {
-    throw new Error(err instanceof Error ? err.message : "Failed to update provider key");
-  } finally {
+  if (!provClean || !keyClean || !valClean) throw new Error("All fields (provider, key name, key value) are required");
+
+  if (dbUrl) {
+    const client = new Client({ connectionString: dbUrl });
     try {
-      await client.end();
-    } catch {}
+      await client.connect();
+      await client.query(`
+        INSERT INTO public.provider_keys (provider, key_name, key_value, is_active)
+        VALUES ($1, $2, $3, true)
+        ON CONFLICT (provider, key_name)
+        DO UPDATE SET key_value = EXCLUDED.key_value, is_active = true;
+      `, [provClean, keyClean, valClean]);
+      return { success: true };
+    } catch (err) {
+      console.warn("[9jaPulse] PG direct connection failed in saveProviderKeyAdmin, trying HTTPS API fallback:", err);
+    } finally {
+      try {
+        await client.end();
+      } catch {}
+    }
   }
+
+  // Fallback to HTTPS API client
+  const svc = createServiceClient() as any;
+  const { error } = await svc
+    .from("provider_keys")
+    .upsert({
+      provider: provClean,
+      key_name: keyClean,
+      key_value: valClean,
+      is_active: true
+    }, { onConflict: "provider, key_name" });
+
+  if (error) throw new Error(error.message);
+  return { success: true };
 }
 
 /**
@@ -266,7 +303,6 @@ export async function saveProviderKeyAdmin(
  */
 export async function syncGSubzDataPlansAdmin(customDbUrl?: string): Promise<{ success: boolean; message: string }> {
   const dbUrl = customDbUrl || process.env.DATABASE_URL;
-  if (!dbUrl) throw new Error("DATABASE_URL environment variable is not defined.");
 
   // 1. Fetch GSubz API key using service role client
   const svc = createServiceClient() as any;
@@ -298,10 +334,22 @@ export async function syncGSubzDataPlansAdmin(customDbUrl?: string): Promise<{ s
     "etisalat_data"
   ];
 
-  const client = new Client({ connectionString: dbUrl });
-  await client.connect();
-
   let totalSynced = 0;
+  let useHttpsFallback = false;
+  let client: Client | null = null;
+
+  if (dbUrl) {
+    try {
+      client = new Client({ connectionString: dbUrl });
+      await client.connect();
+    } catch (err) {
+      console.warn("[9jaPulse] PG direct connection failed in syncGSubzDataPlansAdmin, falling back to HTTPS client:", err);
+      useHttpsFallback = true;
+      client = null;
+    }
+  } else {
+    useHttpsFallback = true;
+  }
 
   try {
     for (const service of services) {
@@ -333,29 +381,53 @@ export async function syncGSubzDataPlansAdmin(customDbUrl?: string): Promise<{ s
           const price = Number(plan.price) || 0;
           currentValues.push(value);
 
-          await client.query(`
-            INSERT INTO public.data_plans (service, display_name, plan_value, price, discount, fixed_price, full_service_name)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (service, plan_value)
-            DO UPDATE SET 
-              display_name = EXCLUDED.display_name, 
-              price = EXCLUDED.price, 
-              discount = EXCLUDED.discount, 
-              fixed_price = EXCLUDED.fixed_price, 
-              full_service_name = EXCLUDED.full_service_name,
-              created_at = now()
-          `, [service, displayName, value, price, discount, fixedPrice, fullName]);
+          if (client && !useHttpsFallback) {
+            await client.query(`
+              INSERT INTO public.data_plans (service, display_name, plan_value, price, discount, fixed_price, full_service_name)
+              VALUES ($1, $2, $3, $4, $5, $6, $7)
+              ON CONFLICT (service, plan_value)
+              DO UPDATE SET 
+                display_name = EXCLUDED.display_name, 
+                price = EXCLUDED.price, 
+                discount = EXCLUDED.discount, 
+                fixed_price = EXCLUDED.fixed_price, 
+                full_service_name = EXCLUDED.full_service_name,
+                created_at = now()
+            `, [service, displayName, value, price, discount, fixedPrice, fullName]);
+          } else {
+            const { error: upsertErr } = await svc
+              .from("data_plans")
+              .upsert({
+                service,
+                display_name: displayName,
+                plan_value: value,
+                price,
+                discount,
+                fixed_price: fixedPrice,
+                full_service_name: fullName
+              }, { onConflict: "service, plan_value" });
+            if (upsertErr) throw upsertErr;
+          }
 
           totalSynced++;
         }
 
         // Delete plans that no longer exist for this service
         if (currentValues.length > 0) {
-          const placeholders = currentValues.map((_, i) => `$${i + 2}`).join(",");
-          await client.query(`
-            DELETE FROM public.data_plans
-            WHERE service = $1 AND plan_value NOT IN (${placeholders})
-          `, [service, ...currentValues]);
+          if (client && !useHttpsFallback) {
+            const placeholders = currentValues.map((_, i) => `$${i + 2}`).join(",");
+            await client.query(`
+              DELETE FROM public.data_plans
+              WHERE service = $1 AND plan_value NOT IN (${placeholders})
+            `, [service, ...currentValues]);
+          } else {
+            // Replaced custom array exclusion with simpler Supabase API command
+            await svc
+              .from("data_plans")
+              .delete()
+              .eq("service", service)
+              .not("plan_value", "in", `(${currentValues.map(v => `"${v}"`).join(",")})`);
+          }
         }
       } catch (svcErr) {
         console.error(`[9jaPulse] Failed to sync service ${service}:`, svcErr);
@@ -370,9 +442,12 @@ export async function syncGSubzDataPlansAdmin(customDbUrl?: string): Promise<{ s
     console.error("[9jaPulse] GSubz data plans sync failed:", err);
     throw new Error(err.message || "Failed to sync plans");
   } finally {
-    try {
-      await client.end();
-    } catch {}
+    if (client) {
+      try {
+        await client.end();
+      } catch {}
+    }
   }
 }
+
 
