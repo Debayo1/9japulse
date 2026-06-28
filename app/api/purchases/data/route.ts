@@ -10,6 +10,35 @@ const NETWORK_MAP: Record<string, "MTN" | "Airtel" | "Glo" | "9mobile"> = {
   "9mobile": "9mobile",
 };
 
+const STATIC_DATA_PLANS: Record<string, { id: string; label: string; price: number; validity: string }[]> = {
+  mtn: [
+    { id: "mtn-1gb", label: "MTN SME 1.0 GB", price: 250, validity: "30 Days" },
+    { id: "mtn-2gb", label: "MTN SME 2.0 GB", price: 500, validity: "30 Days" },
+    { id: "mtn-5gb", label: "MTN SME 5.0 GB", price: 1250, validity: "30 Days" },
+    { id: "mtn-10gb", label: "MTN SME 10.0 GB", price: 2500, validity: "30 Days" },
+    { id: "mtn-1.5gb-gift", label: "MTN Gifting 1.5 GB", price: 350, validity: "30 Days" },
+    { id: "mtn-3gb-gift", label: "MTN Gifting 3.0 GB", price: 700, validity: "30 Days" },
+  ],
+  airtel: [
+    { id: "art-1.5gb", label: "Airtel CG 1.5 GB", price: 350, validity: "30 Days" },
+    { id: "art-3gb", label: "Airtel CG 3.0 GB", price: 700, validity: "30 Days" },
+    { id: "art-5gb", label: "Airtel CG 5.0 GB", price: 1150, validity: "30 Days" },
+    { id: "art-10gb", label: "Airtel CG 10.0 GB", price: 2300, validity: "30 Days" },
+  ],
+  glo: [
+    { id: "glo-1.35gb", label: "Glo CG 1.35 GB", price: 290, validity: "14 Days" },
+    { id: "glo-2.9gb", label: "Glo CG 2.9 GB", price: 580, validity: "30 Days" },
+    { id: "glo-5.8gb", label: "Glo CG 5.8 GB", price: 1160, validity: "30 Days" },
+    { id: "glo-10gb", label: "Glo CG 10.0 GB", price: 2000, validity: "30 Days" },
+  ],
+  "9mobile": [
+    { id: "9mob-1gb", label: "9mobile CG 1.0 GB", price: 300, validity: "30 Days" },
+    { id: "9mob-2gb", label: "9mobile CG 2.0 GB", price: 600, validity: "30 Days" },
+    { id: "9mob-5gb", label: "9mobile CG 5.0 GB", price: 1400, validity: "30 Days" },
+    { id: "9mob-10gb", label: "9mobile CG 10.0 GB", price: 2800, validity: "30 Days" },
+  ],
+};
+
 export async function POST(req: NextRequest) {
   try {
     // ── 1. Authenticate the request ──────────────────────────────────────────
@@ -46,17 +75,50 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unsupported operator network" }, { status: 400 });
     }
 
+    // ── 3.5. Determine dynamic or static plan settings ──────────────────────
+    let serviceID = network.toLowerCase();
+    let planValue = planId;
+    let purchaseAmount = amount;
+    let planLabel = planId;
+
+    const isDbPlan = /^\d+$/.test(String(planId));
+    if (isDbPlan) {
+      const svc = createServiceClient() as any;
+      const { data: dbPlan, error: dbPlanErr } = await svc
+        .from("data_plans")
+        .select("*")
+        .eq("id", planId)
+        .maybeSingle();
+
+      if (dbPlanErr || !dbPlan) {
+        return NextResponse.json({ error: "Invalid data plan selected from database" }, { status: 400 });
+      }
+
+      serviceID = dbPlan.service; // e.g. "mtn_sme"
+      planValue = dbPlan.plan_value; // e.g. "500mb"
+      purchaseAmount = Number(dbPlan.price);
+      planLabel = dbPlan.display_name || `${dbPlan.full_service_name || dbPlan.service} - ${dbPlan.plan_value}`;
+    } else {
+      // Fallback to static plans definition
+      const staticList = STATIC_DATA_PLANS[network.toLowerCase()] || [];
+      const staticPlan = staticList.find((p) => p.id === planId);
+      if (staticPlan) {
+        purchaseAmount = staticPlan.price;
+        planLabel = staticPlan.label;
+      }
+    }
+
     // ── 4. Fetch Wallet & Verify Balance ─────────────────────────────────────
     const wallet = await getWallet(user.id);
-    if (Number(wallet.balance_withdrawable) < amount) {
+    if (Number(wallet.balance_withdrawable) < purchaseAmount) {
       return NextResponse.json({ error: "Insufficient withdrawable balance" }, { status: 400 });
     }
 
     // ── 5. Deduct funds (status = pending) ───────────────────────────────────
     const ledgerRes = await applyTransaction(wallet.id, {
       service_type: "data",
-      amount,
-      description: `Data subscription for ${phone} (${mappedNetwork} - ${planId})`,
+      amount: purchaseAmount,
+      description: `Data subscription: ${planLabel} for ${phone}`,
       status: "pending",
     });
 
@@ -66,10 +128,10 @@ export async function POST(req: NextRequest) {
     try {
       // ── 6. Call Payment Provider (GSubz) ─────────────────────────────────
       const providerRes = await gsubzPurchaseData({
-        network: network.toLowerCase(),
+        network: serviceID,
         phone,
-        plan_id: planId,
-        amount,
+        plan_id: planValue,
+        amount: purchaseAmount,
         requestID: txnId,
       });
 
@@ -88,7 +150,7 @@ export async function POST(req: NextRequest) {
 
         await applyTransaction(wallet.id, {
           service_type: "refund",
-          amount,
+          amount: purchaseAmount,
           description: `Refund: Failed data purchase for ${phone}`,
           status: "success",
           reference: txnId,
@@ -105,7 +167,7 @@ export async function POST(req: NextRequest) {
 
       await applyTransaction(wallet.id, {
         service_type: "refund",
-        amount,
+        amount: purchaseAmount,
         description: `Refund: Failed data purchase for ${phone}`,
         status: "success",
         reference: txnId,

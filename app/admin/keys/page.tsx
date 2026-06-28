@@ -12,6 +12,7 @@ import {
   getProviderKeysAdmin,
   saveProviderKeyAdmin,
   ProviderKeyRow,
+  syncGSubzDataPlansAdmin,
 } from "@/lib/dbAdmin";
 
 export default function AdminKeysPage() {
@@ -91,6 +92,18 @@ export default function AdminKeysPage() {
     });
   };
 
+  const handleSyncDataPlans = () => {
+    startTransition(async () => {
+      try {
+        toast.loading("Synchronizing plans with GSubz API...", { id: "sync-plans" });
+        const res = await syncGSubzDataPlansAdmin(dbUrl);
+        toast.success(res.message, { id: "sync-plans" });
+      } catch (err: any) {
+        toast.error(err.message || "Failed to sync plans", { id: "sync-plans" });
+      }
+    });
+  };
+
   const handleSaveKey = (e: React.FormEvent) => {
     e.preventDefault();
     if (!keyValue) {
@@ -141,22 +154,33 @@ export default function AdminKeysPage() {
             />
           </div>
 
-          <div style={{ display: "flex", gap: "0.75rem" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", width: "100%" }}>
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <button
+                onClick={handleTestConnection}
+                className="btn btn-secondary"
+                style={{ flex: 1, fontSize: "0.8125rem", height: "42px" }}
+                disabled={isPending}
+              >
+                Test Connection
+              </button>
+              <button
+                onClick={handleRunMigrations}
+                className="btn btn-primary"
+                style={{ flex: 1, fontSize: "0.8125rem", height: "42px" }}
+                disabled={isPending}
+              >
+                Run Migrations
+              </button>
+            </div>
             <button
-              onClick={handleTestConnection}
+              onClick={handleSyncDataPlans}
               className="btn btn-secondary"
-              style={{ flex: 1, fontSize: "0.8125rem", height: "42px" }}
+              style={{ width: "100%", fontSize: "0.8125rem", height: "42px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
               disabled={isPending}
             >
-              Test Connection
-            </button>
-            <button
-              onClick={handleRunMigrations}
-              className="btn btn-primary"
-              style={{ flex: 1, fontSize: "0.8125rem", height: "42px" }}
-              disabled={isPending}
-            >
-              Run Migrations (SQL)
+              <ArrowsClockwise size={16} />
+              Sync GSubz Data Plans
             </button>
           </div>
         </div>

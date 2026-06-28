@@ -3,6 +3,7 @@
 import { Client } from "pg";
 import fs from "fs";
 import path from "path";
+import { createServiceClient } from "./supabaseServer";
 
 let isDbVerified = false;
 
@@ -94,6 +95,22 @@ export async function ensureDbColumnsExist(): Promise<void> {
         meta jsonb,
         created_at timestamptz NOT NULL DEFAULT now(),
         updated_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+
+    // 5. Ensure data_plans table exists for GSubz sync
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public.data_plans (
+        id bigserial PRIMARY KEY,
+        service text NOT NULL,
+        display_name text,
+        plan_value text NOT NULL,
+        price numeric(12,2) NOT NULL,
+        discount text DEFAULT '0%',
+        fixed_price boolean NOT NULL DEFAULT true,
+        full_service_name text,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (service, plan_value)
       );
     `);
 
@@ -243,3 +260,119 @@ export async function saveProviderKeyAdmin(
     } catch {}
   }
 }
+
+/**
+ * Syncs dynamic data plans from the GSubz API and saves them to the database.
+ */
+export async function syncGSubzDataPlansAdmin(customDbUrl?: string): Promise<{ success: boolean; message: string }> {
+  const dbUrl = customDbUrl || process.env.DATABASE_URL;
+  if (!dbUrl) throw new Error("DATABASE_URL environment variable is not defined.");
+
+  // 1. Fetch GSubz API key using service role client
+  const svc = createServiceClient() as any;
+  const { data: activeKey, error: keyErr } = await svc
+    .from("provider_keys")
+    .select("key_value")
+    .eq("provider", "gsubz")
+    .eq("key_name", "api_key")
+    .eq("is_active", true)
+    .maybeSingle();
+
+  const apiKey = activeKey?.key_value || process.env.GSUBZ_API_KEY;
+  if (!apiKey) {
+    throw new Error("GSubz api_key is missing. Please save it in Provider Keys.");
+  }
+
+  const services = [
+    "mtn_sme",
+    "mtn_cg_lite",
+    "mtn_gifting",
+    "mtn_datashare",
+    "mtn_coupon",
+    "mtncg",
+    "airtel_gifting",
+    "airtel_sme",
+    "airtel_cg",
+    "glo_data",
+    "glo_sme",
+    "etisalat_data"
+  ];
+
+  const client = new Client({ connectionString: dbUrl });
+  await client.connect();
+
+  let totalSynced = 0;
+
+  try {
+    for (const service of services) {
+      try {
+        const url = `https://api.gsubz.com/api/plans/?service=${encodeURIComponent(service)}`;
+        const res = await fetch(url, {
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+          }
+        });
+        if (!res.ok) continue;
+
+        const data = await res.json();
+        if (data.error || !data.plans || !Array.isArray(data.plans)) {
+          console.warn(`[9jaPulse] GSubz API returned error or invalid plans for service ${service}:`, data.error || "No plans");
+          continue;
+        }
+
+        const discount = data.discount || "0%";
+        const fixedPrice = data.fixedPrice !== false;
+        const fullName = data.service || service.replace(/_/g, " ").toUpperCase();
+
+        const currentValues: string[] = [];
+
+        for (const plan of data.plans) {
+          if (!plan.value) continue;
+          const displayName = plan.displayName || "Unknown Plan";
+          const value = String(plan.value);
+          const price = Number(plan.price) || 0;
+          currentValues.push(value);
+
+          await client.query(`
+            INSERT INTO public.data_plans (service, display_name, plan_value, price, discount, fixed_price, full_service_name)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (service, plan_value)
+            DO UPDATE SET 
+              display_name = EXCLUDED.display_name, 
+              price = EXCLUDED.price, 
+              discount = EXCLUDED.discount, 
+              fixed_price = EXCLUDED.fixed_price, 
+              full_service_name = EXCLUDED.full_service_name,
+              created_at = now()
+          `, [service, displayName, value, price, discount, fixedPrice, fullName]);
+
+          totalSynced++;
+        }
+
+        // Delete plans that no longer exist for this service
+        if (currentValues.length > 0) {
+          const placeholders = currentValues.map((_, i) => `$${i + 2}`).join(",");
+          await client.query(`
+            DELETE FROM public.data_plans
+            WHERE service = $1 AND plan_value NOT IN (${placeholders})
+          `, [service, ...currentValues]);
+        }
+      } catch (svcErr) {
+        console.error(`[9jaPulse] Failed to sync service ${service}:`, svcErr);
+      }
+    }
+
+    return {
+      success: true,
+      message: `Successfully synchronized ${totalSynced} data plans from GSubz API!`,
+    };
+  } catch (err: any) {
+    console.error("[9jaPulse] GSubz data plans sync failed:", err);
+    throw new Error(err.message || "Failed to sync plans");
+  } finally {
+    try {
+      await client.end();
+    } catch {}
+  }
+}
+

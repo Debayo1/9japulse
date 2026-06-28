@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Header from "./Header";
 import Image from "next/image";
 import { Info, WifiHigh } from "@phosphor-icons/react";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import { fetchActiveDataPlans, DataPlanDb } from "@/lib/dataPlans";
 
 interface DataFormProps {
   walletId: string;
@@ -65,7 +66,30 @@ export default function DataForm({ walletId, initialWithdrawable }: DataFormProp
   const [showConfirm, setShowConfirm] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const activePlans = DATA_PLANS[network] ?? [];
+  const [allPlans, setAllPlans] = useState<DataPlanDb[]>([]);
+
+  useEffect(() => {
+    fetchActiveDataPlans().then((plans) => {
+      setAllPlans(plans);
+    });
+  }, []);
+
+  const activePlans = allPlans.length > 0
+    ? allPlans.filter(p => {
+        const s = p.service.toLowerCase();
+        if (network === "mtn") return s.startsWith("mtn");
+        if (network === "airtel") return s.startsWith("airtel");
+        if (network === "glo") return s.startsWith("glo");
+        if (network === "9mobile") return s.startsWith("etisalat") || s.startsWith("9mobile");
+        return false;
+      }).map(p => ({
+        id: p.id,
+        label: p.display_name || `${p.full_service_name || p.service} - ${p.plan_value}`,
+        price: p.price,
+        validity: "30 Days",
+      }))
+    : (DATA_PLANS[network] ?? []);
+
   const selectedPlan = activePlans[planIndex] ?? activePlans[0];
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {

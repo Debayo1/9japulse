@@ -162,3 +162,18 @@ create trigger set_platform_settings_updated_at
 create trigger set_virtual_accounts_updated_at
   before update on virtual_accounts
   for each row execute procedure set_updated_at();
+
+-- ─── data_plans ─────────────────────────────────────────────────────────────────
+create table if not exists public.data_plans (
+  id                  bigserial   primary key,
+  service             text        not null,
+  display_name        text,
+  plan_value          text        not null,
+  price               numeric(12,2) not null,
+  discount            text        default '0%',
+  fixed_price         boolean     not null default true,
+  full_service_name   text,
+  created_at          timestamptz not null default now(),
+  unique (service, plan_value)
+);
+
