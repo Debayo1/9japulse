@@ -67,11 +67,9 @@ export default function Header({
         top: 0,
         zIndex: 40,
         margin: "-1.25rem -1.25rem 1.25rem -1.25rem",
-        background: "var(--bg-glass)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        borderBottom: "1px solid var(--border-glass)",
-        boxShadow: "0 4px 30px rgba(0, 0, 0, 0.015)",
+        background: "var(--bg-base)",
+        borderBottom: "1px solid var(--border)",
+        boxShadow: "none",
         transition: "background-color var(--duration-normal), border-color var(--duration-normal)",
       }}
     >

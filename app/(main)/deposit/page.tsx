@@ -49,8 +49,8 @@ export default async function DepositPage() {
 
       <div className="card" style={{ padding: "1rem" }}>
         <h2 style={{ marginBottom: "0.5rem" }}>Funding notes</h2>
-        <p style={{ fontSize: "0.875rem" }}>
-          Send money to the account above. Once the NCWallet webhook confirms the deposit, the wallet balance can be updated from the admin side or your webhook handler.
+        <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+          Transfer funds directly to your personalized account details displayed above. Your wallet balance will be funded automatically within minutes once the transfer is confirmed.
         </p>
       </div>
     </div>

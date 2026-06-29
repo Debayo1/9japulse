@@ -2,7 +2,7 @@
 
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "./supabaseClient";
-import { createServerClient } from "./supabaseServer";
+import { createServerClient, createServiceClient } from "./supabaseServer";
 import { ensureDbColumnsExist } from "./dbAdmin";
 
 // ─── Sign Up ─────────────────────────────────────────────────────────────────
@@ -199,3 +199,108 @@ function parseJwtPayload(token: string): Record<string, unknown> | null {
     return null;
   }
 }
+
+// ─── App Lock Passcode Actions ────────────────────────────────────────────────
+export async function updateAppPasscode(
+  currentPasscode: string | null,
+  newPasscode: string,
+  accessTokenOverride?: string,
+  refreshTokenOverride?: string
+): Promise<{ success: boolean }> {
+  try {
+    const { client, accessToken, refreshToken } = await createServerClient(
+      accessTokenOverride ?? null,
+      refreshTokenOverride ?? null
+    );
+    if (!accessToken) throw new Error("Unauthorized");
+
+    if (refreshToken) {
+      await client.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+    }
+
+    const { data: { user }, error: userError } = await client.auth.getUser(accessToken);
+    if (userError || !user) throw new Error("Unauthorized");
+
+    const svc = createServiceClient() as any;
+
+    if (currentPasscode) {
+      const { data: profile } = await svc
+        .from("profiles")
+        .select("passcode")
+        .eq("id", user.id)
+        .single();
+      
+      if (profile?.passcode && String(profile.passcode) !== String(currentPasscode)) {
+        throw new Error("Current passcode is incorrect");
+      }
+    }
+
+    const { error } = await svc
+      .from("profiles")
+      .update({ passcode: newPasscode })
+      .eq("id", user.id);
+
+    if (error) throw new Error(error.message);
+    return { success: true };
+  } catch (err: any) {
+    throw new Error(err.message || "Failed to update passcode");
+  }
+}
+
+export async function verifyAppPasscodeAction(passcode: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const { client, accessToken } = await createServerClient();
+    if (!accessToken) throw new Error("Unauthorized");
+
+    const { data: { user }, error: userError } = await client.auth.getUser(accessToken);
+    if (userError || !user) throw new Error("Unauthorized");
+
+    const svc = createServiceClient() as any;
+    const { data: profile, error } = await svc
+      .from("profiles")
+      .select("passcode")
+      .eq("id", user.id)
+      .single();
+
+    if (error || !profile) {
+      throw new Error("Failed to load user profile passcode");
+    }
+
+    if (!profile.passcode) {
+      return { success: true, message: "Passcode not set" };
+    }
+
+    if (String(passcode) === String(profile.passcode)) {
+      return { success: true, message: "Passcode correct" };
+    } else {
+      return { success: false, message: "Incorrect passcode" };
+    }
+  } catch (err: any) {
+    return { success: false, message: err.message || "Passcode verification failed" };
+  }
+}
+
+export async function checkHasPasscodeAction(): Promise<{ success: boolean; hasPasscode: boolean }> {
+  try {
+    const { client, accessToken } = await createServerClient();
+    if (!accessToken) return { success: false, hasPasscode: false };
+
+    const { data: { user } } = await client.auth.getUser(accessToken);
+    if (!user) return { success: false, hasPasscode: false };
+
+    const svc = createServiceClient() as any;
+    const { data: profile } = await svc
+      .from("profiles")
+      .select("passcode")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    return { success: true, hasPasscode: !!profile?.passcode };
+  } catch {
+    return { success: false, hasPasscode: false };
+  }
+}
+

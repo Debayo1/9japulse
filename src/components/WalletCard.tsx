@@ -112,48 +112,12 @@ export default function WalletCard({
       />
 
       <div style={{ position: "relative", zIndex: 1 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", marginBottom: "1rem" }}>
-          <div style={{ minWidth: 0 }}>
-            <p style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "0.25rem" }}>
-              Hi, {firstName}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", marginBottom: "1.25rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Bank size={18} weight="duotone" color="var(--color-primary)" />
+            <p style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
+              Wallet Balance
             </p>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <Bank size={18} weight="duotone" color="var(--color-primary)" />
-              <p style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
-                Wallet Balance
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setHidden((value) => !value)}
-            aria-label={hidden ? "Show balance" : "Hide balance"}
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: "50%",
-              border: "none",
-              background: "color-mix(in srgb, var(--bg-base) 70%, transparent)",
-              color: "var(--text-primary)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-            }}
-          >
-            {hidden ? <Eye size={17} weight="fill" /> : <EyeSlash size={17} weight="regular" />}
-          </button>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "1rem", marginBottom: "1rem" }}>
-          <div style={{ minWidth: 0 }}>
-            <p style={{ fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: "0.35rem" }}>
-              Total Balance
-            </p>
-            <h1 style={{ fontSize: "2rem", lineHeight: 1, margin: 0, fontWeight: 900, letterSpacing: "-0.04em", color: "var(--text-primary)" }}>
-              {hidden ? "••••••••" : fmt(balances.total)}
-            </h1>
           </div>
 
           <button
@@ -163,21 +127,52 @@ export default function WalletCard({
               flexShrink: 0,
               border: "none",
               borderRadius: 999,
-              padding: "0.65rem 0.95rem",
+              padding: "0.55rem 0.85rem",
               background: "var(--color-primary)",
               color: "#fff",
               display: "inline-flex",
               alignItems: "center",
               gap: "0.4rem",
-              fontSize: "0.78rem",
+              fontSize: "0.75rem",
               fontWeight: 800,
               cursor: "pointer",
               boxShadow: "0 10px 22px -14px rgba(79, 70, 229, 0.8)",
             }}
           >
-            <PlusCircle size={16} weight="fill" />
+            <PlusCircle size={15} weight="fill" />
             Deposit
           </button>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", marginBottom: "1rem" }}>
+          <p style={{ fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)", margin: 0 }}>
+            Total Balance
+          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
+            <h1 style={{ fontSize: "2rem", lineHeight: 1.1, margin: 0, fontWeight: 900, letterSpacing: "-0.04em", color: "var(--text-primary)" }}>
+              {hidden ? "••••••••" : fmt(balances.total)}
+            </h1>
+            <button
+              type="button"
+              onClick={() => setHidden((value) => !value)}
+              aria-label={hidden ? "Show balance" : "Hide balance"}
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                border: "none",
+                background: "color-mix(in srgb, var(--bg-base) 70%, transparent)",
+                color: "var(--text-primary)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                flexShrink: 0
+              }}
+            >
+              {hidden ? <Eye size={15} weight="fill" /> : <EyeSlash size={15} weight="regular" />}
+            </button>
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: "0.7rem" }}>

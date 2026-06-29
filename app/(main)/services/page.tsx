@@ -1,5 +1,7 @@
-import { getUser } from "@/lib/auth";
-import { redirect } from "next/navigation";
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   DeviceMobile,
   Globe,
@@ -9,9 +11,10 @@ import {
   Coins,
   Books,
   SquaresFour,
-} from "@phosphor-icons/react/dist/ssr";
+} from "@phosphor-icons/react";
 import Link from "next/link";
 import Header from "@/components/Header";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 const UTILITIES = [
   { label: "Airtime",     Icon: DeviceMobile, href: "/services/airtime",      color: "#EF4444", desc: "Top up instantly" },
@@ -26,9 +29,18 @@ const OTHER_SERVICES = [
   { label: "Exam PIN",    Icon: Books,        href: "/services/exam",         color: "#F97316", desc: "Pin generators" },
 ];
 
-export default async function ServicesPage() {
-  const user = await getUser();
-  if (!user) redirect("/login");
+export default function ServicesPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    async function checkAuth() {
+      const { data } = await supabaseBrowser.auth.getSession();
+      if (!data.session) {
+        router.replace("/login");
+      }
+    }
+    checkAuth();
+  }, [router]);
 
   return (
     <div className="page">
@@ -79,14 +91,15 @@ export default async function ServicesPage() {
                   width: "42px",
                   height: "42px",
                   borderRadius: "12px",
-                  background: `${color}1A`,
+                  backgroundColor: "var(--bg-elevated)",
+                  boxShadow: `0 6px 14px -3px color-mix(in srgb, ${color} 35%, transparent)`,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   color: color,
                 }}
               >
-                <Icon size={20} weight="duotone" />
+                <Icon size={20} weight="fill" />
               </div>
               <div>
                 <p style={{ fontSize: "0.875rem", fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>{label}</p>
@@ -122,14 +135,15 @@ export default async function ServicesPage() {
                   width: "42px",
                   height: "42px",
                   borderRadius: "12px",
-                  background: `${color}1A`,
+                  backgroundColor: "var(--bg-elevated)",
+                  boxShadow: `0 6px 14px -3px color-mix(in srgb, ${color} 35%, transparent)`,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   color: color,
                 }}
               >
-                <Icon size={20} weight="duotone" />
+                <Icon size={20} weight="fill" />
               </div>
               <div>
                 <p style={{ fontSize: "0.875rem", fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>{label}</p>

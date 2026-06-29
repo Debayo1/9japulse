@@ -110,6 +110,14 @@ h3 { font-size: 1.0625rem; font-weight: 600; line-height: 1.4; }
 p  { line-height: 1.6; color: var(--text-secondary); }
 
 /* ─── Layout & Page Containers ──────────────────────────────────── */
+html, body {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+html::-webkit-scrollbar, body::-webkit-scrollbar {
+  display: none;
+}
+
 .page {
   max-width: 480px;
   margin: 0 auto;
@@ -117,6 +125,11 @@ p  { line-height: 1.6; color: var(--text-secondary); }
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.page::-webkit-scrollbar {
+  display: none;
 }
 
 /* ─── Card & Glassmorphism ──────────────────────────────────────── */

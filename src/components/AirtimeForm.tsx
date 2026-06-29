@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Header from "./Header";
 import Image from "next/image";
-import { DeviceMobile } from "@phosphor-icons/react";
+import { DeviceMobile, Backspace } from "@phosphor-icons/react";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 interface AirtimeFormProps {
-  walletId: string;
-  initialWithdrawable: number;
+  walletId?: string;
+  initialWithdrawable?: number;
 }
 
 const NETWORKS = [
@@ -29,7 +29,86 @@ export default function AirtimeForm({ walletId, initialWithdrawable }: AirtimeFo
   const [amount, setAmount] = useState("");
   const [pin, setPin] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showPinPad, setShowPinPad] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  // Balance cache state & Realtime updates
+  const [wId, setWId] = useState(walletId || "");
+  const [withdrawable, setWithdrawable] = useState(initialWithdrawable ?? 0);
+
+  useEffect(() => {
+    // Restores cache instantly
+    const cached = localStorage.getItem("vtu_wallet_cache");
+    if (cached) {
+      const wObj = JSON.parse(cached);
+      if (!wId) setWId(wObj.id);
+      if (initialWithdrawable === undefined) setWithdrawable(wObj.balance_withdrawable);
+    }
+
+    async function syncBalance() {
+      try {
+        const { data: session } = await supabaseBrowser.auth.getSession();
+        const user = session?.session?.user;
+        if (!user) return;
+        const { data: wallet } = await (supabaseBrowser
+          .from("wallets")
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle() as any);
+        if (wallet) {
+          const wObj = {
+            id: wallet.id,
+            balance_total: Number(wallet.balance_total),
+            balance_withdrawable: Number(wallet.balance_withdrawable)
+          };
+          setWId(wObj.id);
+          setWithdrawable(wObj.balance_withdrawable);
+          localStorage.setItem("vtu_wallet_cache", JSON.stringify(wObj));
+        }
+      } catch (err) {
+        console.error("Failed to sync wallet in AirtimeForm:", err);
+      }
+    }
+    syncBalance();
+
+    // Subscribe to Postgres balance changes for real-time DB changes
+    let isMounted = true;
+    let sub: any = null;
+    async function setupRealtime() {
+      const { data } = await supabaseBrowser.auth.getSession();
+      const user = data.session?.user;
+      if (!user || !isMounted) return;
+
+      sub = supabaseBrowser
+        .channel(`wallet-realtime-airtime-${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "wallets",
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            const newW = payload.new as any;
+            setWithdrawable(Number(newW.balance_withdrawable));
+            const wObj = {
+              id: newW.id,
+              balance_total: Number(newW.balance_total),
+              balance_withdrawable: Number(newW.balance_withdrawable)
+            };
+            localStorage.setItem("vtu_wallet_cache", JSON.stringify(wObj));
+          }
+        )
+        .subscribe();
+    }
+    setupRealtime();
+
+    return () => {
+      isMounted = false;
+      if (sub) supabaseBrowser.removeChannel(sub);
+    };
+  }, [wId, initialWithdrawable]);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Only numeric inputs
@@ -51,11 +130,12 @@ export default function AirtimeForm({ walletId, initialWithdrawable }: AirtimeFo
       return;
     }
     const amtNum = parseFloat(amount);
-    if (isNaN(amtNum) || amtNum < 50) {
-      toast.error("Minimum purchase amount is ₦50");
+    const minAmount = network === "mtn" ? 100 : 50;
+    if (isNaN(amtNum) || amtNum < minAmount) {
+      toast.error(`Minimum purchase amount for MTN is ₦100, and ₦50 for other networks`);
       return;
     }
-    if (amtNum > initialWithdrawable) {
+    if (amtNum > withdrawable) {
       toast.error("Insufficient withdrawable balance");
       return;
     }
@@ -63,15 +143,9 @@ export default function AirtimeForm({ walletId, initialWithdrawable }: AirtimeFo
     setShowConfirm(true);
   };
 
-  const executePurchase = () => {
-    if (pin.length < 4) {
-      toast.error("Please enter your 4-digit security PIN");
-      return;
-    }
-
+  const triggerExecutePurchase = (targetPin: string) => {
     startTransition(async () => {
       try {
-        // Get the current session token to authenticate the API request
         const { data: sessionData } = await supabaseBrowser.auth.getSession();
         const accessToken = sessionData?.session?.access_token;
         if (!accessToken) {
@@ -86,11 +160,11 @@ export default function AirtimeForm({ walletId, initialWithdrawable }: AirtimeFo
             "Authorization": `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
-            walletId,
+            walletId: wId,
             network,
             phone,
             amount: parseFloat(amount),
-            pin,
+            pin: targetPin,
           }),
         });
 
@@ -98,6 +172,7 @@ export default function AirtimeForm({ walletId, initialWithdrawable }: AirtimeFo
         if (!res.ok) throw new Error(json.error ?? "Purchase failed");
 
         toast.success(`₦${amount} Airtime sent successfully to ${phone}!`);
+        setShowPinPad(false);
         setShowConfirm(false);
         setPhone("");
         setAmount("");
@@ -106,6 +181,7 @@ export default function AirtimeForm({ walletId, initialWithdrawable }: AirtimeFo
         router.push(`/services/success?type=airtime&amount=${amount}&phone=${phone}&network=${network}&ref=${json.reference || ""}`);
       } catch (err: unknown) {
         toast.error((err as Error).message ?? "Purchase failed");
+        setPin("");
       }
     });
   };
@@ -113,29 +189,6 @@ export default function AirtimeForm({ walletId, initialWithdrawable }: AirtimeFo
   return (
     <div className="page" style={{ paddingBottom: "1.5rem" }}>
       <Header title="Buy Airtime" />
-
-      {/* ─── Balance Banner ─────────────────────────────────────────────── */}
-      <div
-        className="glass-sm"
-        style={{
-          padding: "1rem 1.25rem",
-          marginBottom: "1.5rem",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          border: "1.5px solid var(--border)",
-        }}
-      >
-        <div>
-          <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", fontWeight: 500 }}>
-            Available Cash
-          </p>
-          <p style={{ fontSize: "1.25rem", fontWeight: 900, color: "var(--color-success)" }}>
-            ₦{initialWithdrawable.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-          </p>
-        </div>
-        <DeviceMobile size={28} weight="duotone" style={{ color: "var(--color-primary)", opacity: 0.8 }} />
-      </div>
 
       {/* ─── Airtime Purchase Form ──────────────────────────────────────── */}
       <form onSubmit={initiatePurchase} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
@@ -155,7 +208,7 @@ export default function AirtimeForm({ walletId, initialWithdrawable }: AirtimeFo
                   style={{
                     backgroundColor: active ? "var(--bg-elevated)" : "var(--bg-surface)",
                     color: "var(--text-primary)",
-                    border: active ? `2px solid var(--color-primary)` : "1.5px solid var(--border)",
+                    border: "none",
                     height: "72px",
                     borderRadius: "16px",
                     display: "flex",
@@ -165,7 +218,7 @@ export default function AirtimeForm({ walletId, initialWithdrawable }: AirtimeFo
                     gap: "6px",
                     cursor: "pointer",
                     transition: "all var(--duration-fast) var(--ease-smooth)",
-                    boxShadow: active ? `0 6px 16px rgba(0, 0, 0, 0.04)` : "none",
+                    boxShadow: active ? `0 8px 20px -4px color-mix(in srgb, ${net.color} 40%, transparent)` : "none",
                   }}
                   className="squishy"
                 >
@@ -209,17 +262,22 @@ export default function AirtimeForm({ walletId, initialWithdrawable }: AirtimeFo
 
         {/* Amount Input */}
         <div>
-          <label
-            htmlFor="airtime-amount"
-            style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)", display: "block", marginBottom: "0.5rem" }}
-          >
-            Amount (₦)
-          </label>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.5rem" }}>
+            <label
+              htmlFor="airtime-amount"
+              style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)" }}
+            >
+              Amount (₦)
+            </label>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", fontWeight: 600 }}>
+              Balance: ₦{withdrawable.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+            </span>
+          </div>
           <div className="input-wrapper" style={{ marginBottom: "0.75rem" }}>
             <input
               id="airtime-amount"
               type="tel"
-              placeholder="Min ₦50 - Max ₦50,000"
+              placeholder={network === "mtn" ? "Min ₦100 - Max ₦50,000" : "Min ₦50 - Max ₦50,000"}
               value={amount}
               onChange={handleAmountChange}
               required
@@ -336,41 +394,6 @@ export default function AirtimeForm({ walletId, initialWithdrawable }: AirtimeFo
               </div>
             </div>
 
-            {/* Security PIN Field */}
-            <div style={{ marginBottom: "1.75rem" }}>
-              <label
-                htmlFor="airtime-pin"
-                style={{
-                  fontSize: "0.8125rem",
-                  fontWeight: 700,
-                  color: "var(--text-secondary)",
-                  display: "block",
-                  textAlign: "center",
-                  marginBottom: "0.625rem",
-                }}
-              >
-                Enter 4-Digit Transaction PIN
-              </label>
-              <input
-                id="airtime-pin"
-                type="password"
-                placeholder="••••"
-                value={pin}
-                onChange={handlePinChange}
-                maxLength={4}
-                style={{
-                  textAlign: "center",
-                  fontSize: "1.5rem",
-                  letterSpacing: "1em",
-                  paddingLeft: "1em",
-                  height: "50px",
-                }}
-                className="input"
-                autoComplete="off"
-                disabled={isPending}
-              />
-            </div>
-
             {/* Actions */}
             <div style={{ display: "flex", gap: "0.75rem" }}>
               <button
@@ -386,13 +409,176 @@ export default function AirtimeForm({ walletId, initialWithdrawable }: AirtimeFo
                 type="button"
                 className="btn btn-primary"
                 style={{ flex: 2, height: "48px" }}
-                onClick={executePurchase}
-                disabled={isPending || pin.length < 4}
+                onClick={() => setShowPinPad(true)}
+                disabled={isPending}
               >
-                {isPending ? "Sending..." : "Confirm & Pay"}
+                Confirm & Pay
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ─── Dedicated Transaction PIN Keypad Overlay ─── */}
+      {showPinPad && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          backgroundColor: "var(--bg-base)",
+          zIndex: 110,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "2rem"
+        }}>
+          {/* Header */}
+          <div style={{ textAlign: "center", marginBottom: "2rem" }}>
+            <span style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-secondary)" }}>
+              SECURITY VERIFICATION
+            </span>
+            <h2 style={{ fontSize: "1.375rem", fontWeight: 800, margin: "0.25rem 0 0.5rem 0" }}>Enter Transaction PIN</h2>
+            <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: 0 }}>
+              Paying <strong style={{ color: "var(--text-primary)" }}>₦{parseFloat(amount).toLocaleString()}</strong> to {phone}
+            </p>
+          </div>
+
+          {/* Dots */}
+          <div style={{ display: "flex", gap: "1rem", marginBottom: "3rem" }}>
+            {[0, 1, 2, 3].map(idx => (
+              <div
+                key={idx}
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: "50%",
+                  border: "2px solid var(--border)",
+                  backgroundColor: pin.length > idx ? "var(--color-primary)" : "transparent",
+                  transform: pin.length > idx ? "scale(1.15)" : "scale(1)",
+                  transition: "all var(--duration-fast) var(--ease-smooth)",
+                  boxShadow: pin.length > idx ? "0 0 8px var(--color-primary)" : "none"
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Keypad */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: "1.25rem 1.5rem",
+            maxWidth: 260,
+            width: "100%",
+            marginBottom: "2rem"
+          }}>
+            {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map(num => (
+              <button
+                key={num}
+                type="button"
+                onClick={() => {
+                  if (pin.length < 4) {
+                    const newPin = pin + num;
+                    setPin(newPin);
+                    if (newPin.length === 4) {
+                      triggerExecutePurchase(newPin);
+                    }
+                  }
+                }}
+                className="squishy"
+                style={{
+                  width: 60,
+                  height: 60,
+                  borderRadius: "50%",
+                  border: "1.5px solid var(--border)",
+                  background: "var(--bg-elevated)",
+                  color: "var(--text-primary)",
+                  fontSize: "1.25rem",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center"
+                }}
+                disabled={isPending}
+              >
+                {num}
+              </button>
+            ))}
+
+            <button
+              type="button"
+              onClick={() => {
+                setPin("");
+                setShowPinPad(false);
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--text-secondary)",
+                fontSize: "0.8125rem",
+                fontWeight: 700,
+                cursor: "pointer"
+              }}
+              disabled={isPending}
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (pin.length < 4) {
+                  const newPin = pin + "0";
+                  setPin(newPin);
+                  if (newPin.length === 4) {
+                    triggerExecutePurchase(newPin);
+                  }
+                }
+              }}
+              className="squishy"
+              style={{
+                width: 60,
+                height: 60,
+                borderRadius: "50%",
+                border: "1.5px solid var(--border)",
+                background: "var(--bg-elevated)",
+                color: "var(--text-primary)",
+                fontSize: "1.25rem",
+                fontWeight: 700,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+              }}
+              disabled={isPending}
+            >
+              0
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setPin(prev => prev.slice(0, -1))}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--text-secondary)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer"
+              }}
+              disabled={isPending}
+            >
+              <Backspace size={22} />
+            </button>
+          </div>
+          
+          {isPending && (
+            <div style={{ color: "var(--text-secondary)", fontSize: "0.8125rem", display: "flex", alignItems: "center", gap: "6px" }}>
+              <div className="spinner" style={{ width: "16px", height: "16px" }} />
+              Verifying PIN & Processing...
+            </div>
+          )}
         </div>
       )}
     </div>

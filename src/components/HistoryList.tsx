@@ -163,7 +163,7 @@ export function TransactionRow({ txn }: TransactionRowProps) {
           color: "var(--text-primary)",
           margin: 0,
         }}>
-          {credit ? "+" : "−"}{fmtAmount(txn.amount)}
+          {fmtAmount(txn.amount)}
         </p>
         <p style={{ fontSize: "0.7188rem", color: "var(--text-muted)", marginTop: "2px", marginBottom: 0 }}>
           {fmtTime(txn.created_at)}

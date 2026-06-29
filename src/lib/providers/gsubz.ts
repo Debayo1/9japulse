@@ -83,6 +83,61 @@ async function callGSubzApi(payload: Record<string, string | number | boolean | 
   return (await res.json()) as GSubzResponse;
 }
 
+export async function mapGSubzError(codeOrMessage: string): Promise<string> {
+  const clean = String(codeOrMessage || "").trim().toUpperCase();
+
+  // Explicit mappings for provider status codes & uppercase raw strings
+  const mappings: Record<string, string> = {
+    "200": "Transaction Successful",
+    "TRANSACTION_SUCCESSFUL": "Transaction Successful",
+    "SUCCESSFUL": "Transaction Successful",
+    
+    "204": "Required details not sent. Please check your form fields.",
+    "REQUIRED_CONTENT_NOT_SENT": "Required details not sent. Please check your form fields.",
+    
+    "206": "Invalid details provided. Please check the recipient number or plan.",
+    "INVALID_CONTENT": "Invalid details provided. Please check the recipient number or plan.",
+    "INVALID_PHONE": "Invalid phone number provided.",
+    
+    "401": "Provider authorization failed. Please contact admin support.",
+    "AUTHORIZATION_FAILED": "Provider authorization failed. Please contact admin support.",
+    
+    "402": "Error in payment processing. Please try again.",
+    "ERROR_IN_PAYMENT": "Error in payment processing. Please try again.",
+    "INSUFFICIENT_BALANCE": "Insufficient provider balance. Please contact admin.",
+    
+    "404": "The requested plan or service was not found.",
+    "CONTENT_NOT_FOUND": "The requested plan or service was not found.",
+    
+    "405": "Invalid protocol method. Please contact support.",
+    "REQUEST_METHOD_NOT_IN_POST": "Invalid protocol method. Please contact support.",
+    
+    "406": "Transaction not allowed on this account.",
+    "NOT_ALLOWED": "Transaction not allowed on this account.",
+    
+    "502": "Operator gateway error. Please try again later.",
+    "GATEWAY_ERROR": "Operator gateway error. Please try again later.",
+  };
+
+  if (mappings[clean]) {
+    return mappings[clean];
+  }
+
+  // Check substring matches
+  for (const [key, value] of Object.entries(mappings)) {
+    if (clean.includes(key)) {
+      return value;
+    }
+  }
+
+  // Prettify general uppercase keys
+  if (clean.includes("_")) {
+    return clean.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
+  }
+
+  return codeOrMessage || "Transaction failed";
+}
+
 // ─── Airtime ──────────────────────────────────────────────────────────────────
 export async function gsubzPurchaseAirtime(
   params: GSubzAirtimeParams
@@ -96,18 +151,19 @@ export async function gsubzPurchaseAirtime(
     });
 
     const status = String(json.status || "").toLowerCase();
-    const success = status === "successful" || status === "transaction_successful";
+    const success = status === "successful" || status === "transaction_successful" || status === "200";
+    const rawMsg = json.description || json.error || json.status || json.message || "Transaction processed";
 
     return {
       success,
       reference: json.transactionID || json.ident || params.requestID,
-      message: json.description || json.error || "Transaction processed",
+      message: await mapGSubzError(rawMsg),
     };
   } catch (err: unknown) {
     return {
       success: false,
       reference: "",
-      message: err instanceof Error ? err.message : "GSubz API connection error",
+      message: err instanceof Error ? await mapGSubzError(err.message) : "GSubz API connection error",
     };
   }
 }
@@ -126,18 +182,19 @@ export async function gsubzPurchaseData(
     });
 
     const status = String(json.status || "").toLowerCase();
-    const success = status === "successful" || status === "transaction_successful";
+    const success = status === "successful" || status === "transaction_successful" || status === "200";
+    const rawMsg = json.description || json.error || json.status || json.message || "Transaction processed";
 
     return {
       success,
       reference: json.transactionID || json.ident || params.requestID,
-      message: json.description || json.error || "Transaction processed",
+      message: await mapGSubzError(rawMsg),
     };
   } catch (err: unknown) {
     return {
       success: false,
       reference: "",
-      message: err instanceof Error ? err.message : "GSubz API connection error",
+      message: err instanceof Error ? await mapGSubzError(err.message) : "GSubz API connection error",
     };
   }
 }
@@ -156,19 +213,20 @@ export async function gsubzBuyElectricity(
     });
 
     const status = String(json.status || "").toLowerCase();
-    const success = status === "successful" || status === "transaction_successful";
+    const success = status === "successful" || status === "transaction_successful" || status === "200";
+    const rawMsg = json.description || json.error || json.status || json.message || "Transaction processed";
 
     return {
       success,
       reference: json.transactionID || json.ident || params.requestID,
-      message: json.description || json.error || "Transaction processed",
+      message: await mapGSubzError(rawMsg),
       token: json.token,
     };
   } catch (err: unknown) {
     return {
       success: false,
       reference: "",
-      message: err instanceof Error ? err.message : "GSubz API connection error",
+      message: err instanceof Error ? await mapGSubzError(err.message) : "GSubz API connection error",
     };
   }
 }
@@ -188,18 +246,19 @@ export async function gsubzRenewCableTV(
     });
 
     const status = String(json.status || "").toLowerCase();
-    const success = status === "successful" || status === "transaction_successful";
+    const success = status === "successful" || status === "transaction_successful" || status === "200";
+    const rawMsg = json.description || json.error || json.status || json.message || "Transaction processed";
 
     return {
       success,
       reference: json.transactionID || json.ident || params.requestID,
-      message: json.description || json.error || "Transaction processed",
+      message: await mapGSubzError(rawMsg),
     };
   } catch (err: unknown) {
     return {
       success: false,
       reference: "",
-      message: err instanceof Error ? err.message : "GSubz API connection error",
+      message: err instanceof Error ? await mapGSubzError(err.message) : "GSubz API connection error",
     };
   }
 }

@@ -138,9 +138,8 @@ export default function ReceiptView({ txn }: ReceiptViewProps) {
           {txn.status === "success" ? "This transaction was processed successfully." : txn.status === "failed" ? "This transaction has failed." : "This transaction is currently pending."}
         </p>
 
-        {/* Large Amount */}
         <div style={{ fontSize: "2.25rem", fontWeight: 900, letterSpacing: "-0.03em", color: "var(--text-primary)", marginBottom: "1.5rem", fontVariantNumeric: "tabular-nums" }}>
-          {credit ? "+" : "−"}{formattedAmount}
+          {formattedAmount}
         </div>
 
         {/* Details Card */}

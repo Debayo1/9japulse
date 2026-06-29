@@ -47,69 +47,78 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", justifyContent: "center", padding: "2rem 1.5rem", maxWidth: 440, margin: "0 auto" }}>
+    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", justifyContent: "center", padding: "2.5rem 1.5rem", maxWidth: 420, margin: "0 auto" }}>
       {/* Logo / Brand */}
-      <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
-        <div style={{ width: 64, height: 64, borderRadius: 18, background: "linear-gradient(135deg, var(--color-primary), var(--color-accent))", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1rem", fontSize: "1.75rem", boxShadow: "var(--shadow-glow)" }}>
+      <div style={{ textAlign: "left", marginBottom: "2.5rem" }}>
+        <div style={{ width: 56, height: 56, borderRadius: 16, background: "linear-gradient(135deg, var(--color-primary), var(--color-accent))", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 0 1.25rem 0", fontSize: "1.5rem", fontWeight: 900, color: "white", boxShadow: "var(--shadow-glow)" }}>
           ₦
         </div>
-        <h1 style={{ fontSize: "1.75rem", fontWeight: 800 }}>9jaPulse</h1>
-        <p style={{ color: "var(--text-secondary)", marginTop: "0.375rem" }}>Sign in to continue</p>
+        <h1 style={{ fontSize: "1.875rem", fontWeight: 800, letterSpacing: "-0.03em", margin: 0 }}>Welcome Back</h1>
+        <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem", marginTop: "0.375rem" }}>Sign in to continue to 9jaPulse</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="animate-slide-up" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+      <form onSubmit={handleSubmit} className="animate-slide-up" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
         {/* Email */}
-        <div style={{ position: "relative" }}>
-          <Envelope size={18} weight="regular" color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-          <input
-            id="login-email"
-            name="email"
-            type="email"
-            placeholder="Email address"
-            required
-            autoComplete="email"
-            className="input"
-            style={{ paddingLeft: "2.75rem" }}
-          />
+        <div>
+          <label htmlFor="login-email" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)", display: "block", marginBottom: "0.5rem" }}>
+            Email Address
+          </label>
+          <div style={{ position: "relative" }}>
+            <Envelope size={18} weight="regular" color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+            <input
+              id="login-email"
+              name="email"
+              type="email"
+              placeholder="e.g. user@gmail.com"
+              required
+              autoComplete="email"
+              className="input"
+              style={{ paddingLeft: "2.75rem" }}
+            />
+          </div>
         </div>
 
         {/* Password */}
-        <div style={{ position: "relative" }}>
-          <Lock size={18} weight="regular" color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-          <input
-            id="login-password"
-            name="password"
-            type={showPwd ? "text" : "password"}
-            placeholder="Password"
-            required
-            autoComplete="current-password"
-            className="input"
-            style={{ paddingLeft: "2.75rem", paddingRight: "2.75rem" }}
-          />
-          <button
-            type="button"
-            onClick={() => setShowPwd((v) => !v)}
-            aria-label={showPwd ? "Hide password" : "Show password"}
-            style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 0 }}
-          >
-            {showPwd ? <EyeSlash size={18} weight="regular" /> : <Eye size={18} weight="regular" />}
-          </button>
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.5rem" }}>
+            <label htmlFor="login-password" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)" }}>
+              Password
+            </label>
+            <Link href="/reset-password" style={{ fontSize: "0.75rem", color: "var(--color-primary)", textDecoration: "none", fontWeight: 600 }}>
+              Forgot password?
+            </Link>
+          </div>
+          <div style={{ position: "relative" }}>
+            <Lock size={18} weight="regular" color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+            <input
+              id="login-password"
+              name="password"
+              type={showPwd ? "text" : "password"}
+              placeholder="••••••••"
+              required
+              autoComplete="current-password"
+              className="input"
+              style={{ paddingLeft: "2.75rem", paddingRight: "2.75rem" }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPwd((v) => !v)}
+              aria-label={showPwd ? "Hide password" : "Show password"}
+              style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 0 }}
+            >
+              {showPwd ? <EyeSlash size={18} weight="regular" /> : <Eye size={18} weight="regular" />}
+            </button>
+          </div>
         </div>
 
-        <div style={{ textAlign: "right" }}>
-          <Link href="/reset-password" style={{ fontSize: "0.875rem", color: "var(--color-primary)", textDecoration: "none", fontWeight: 500 }}>
-            Forgot password?
-          </Link>
-        </div>
-
-        <button id="login-submit-btn" type="submit" className="btn btn-primary btn-full" disabled={isPending}>
+        <button id="login-submit-btn" type="submit" className="btn btn-primary btn-full" style={{ height: "48px", marginTop: "0.5rem" }} disabled={isPending}>
           {isPending ? "Signing in…" : "Sign In"}
         </button>
       </form>
 
-      <p style={{ textAlign: "center", marginTop: "1.75rem", color: "var(--text-secondary)", fontSize: "0.9rem" }}>
+      <p style={{ textAlign: "left", marginTop: "2rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>
         Don&apos;t have an account?{" "}
-        <Link href="/register" style={{ color: "var(--color-primary)", fontWeight: 600, textDecoration: "none" }}>
+        <Link href="/register" style={{ color: "var(--color-primary)", fontWeight: 700, textDecoration: "none" }}>
           Create one
         </Link>
       </p>
