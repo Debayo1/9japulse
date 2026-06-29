@@ -3,6 +3,7 @@
 import type { User } from "@supabase/supabase-js";
 import { createServiceClient } from "./supabaseServer";
 import { getUser } from "./auth";
+import { getProviderKey } from "./providerKeys";
 
 const ADMIN_EMAILS = new Set(
   (process.env.ADMIN_EMAILS ?? "")
@@ -199,5 +200,148 @@ export async function updateTransactionStatusAdminAction(
     return { success: true, message: `Transaction status changed to ${status}!` };
   } catch (err: any) {
     return { success: false, message: err.message || "Failed to update transaction status" };
+  }
+}
+
+export async function updateUserVirtualAccountAdminAction(
+  userId: string,
+  params: {
+    account_number?: string;
+    bank_name?: string;
+    bank_code?: string;
+    account_to_lookup?: string;
+    create_new?: boolean;
+  }
+): Promise<{ success: boolean; message: string; data?: any }> {
+  try {
+    const caller = await getUser();
+    if (!caller || !(await isAdminUser(caller))) throw new Error("Unauthorized");
+
+    const svc = createServiceClient() as any;
+
+    // Fetch user details
+    const { data: profile } = await svc
+      .from("profiles")
+      .select("full_name, email, phone")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (!profile) throw new Error("User profile not found");
+
+    const trnxPin = await getProviderKey("ncwallet", "pin");
+    const apiKey = await getProviderKey("ncwallet", "api_key");
+    const baseUrl = "https://ncwallet.africa/api/v1";
+
+    let payload: any = {};
+    let accountNumber = params.account_number ?? "";
+    let bankName = params.bank_name ?? "Palmpay";
+    let bankCode = params.bank_code ?? "palmpay";
+    let accountType = "static";
+    let accountName = profile.full_name || profile.email || "User";
+    let providerRef: string | null = null;
+    let webhookUrl: string | null = null;
+
+    // Case 1: Lookup existing account number
+    if (params.account_to_lookup) {
+      const res = await fetch(`${baseUrl}/bank/account-number/${params.account_to_lookup}`, {
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+          "trnx_pin": trnxPin,
+          "Authorization": apiKey,
+        }
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && String(json.status ?? "").toLowerCase() === "success" && json.data) {
+        payload = json.data;
+        accountNumber = String(payload.account_number);
+        bankName = String(payload.bank_name ?? "Palmpay");
+        bankCode = String(payload.bank_code ?? "palmpay");
+        accountName = String(payload.account_name ?? accountName);
+        providerRef = json.ref_id || null;
+      } else {
+        throw new Error(json.message || "Lookup failed or account not found on NCWallet");
+      }
+    }
+    // Case 2: Create brand new from NCWallet
+    else if (params.create_new) {
+      let bvn = process.env.NCWALLET_BVN ?? "";
+      if (!bvn) {
+        try {
+          bvn = await getProviderKey("ncwallet", "bvn");
+        } catch {
+          bvn = "";
+        }
+      }
+      if (!bvn) throw new Error("Missing NCWallet BVN. Please set NCWALLET_BVN.");
+
+      const res = await fetch(`${baseUrl}/bank/create`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "trnx_pin": trnxPin,
+          "Authorization": apiKey,
+        },
+        body: JSON.stringify({
+          bank_code: "palmpay",
+          account_name: accountName,
+          email: profile.email,
+          phone_number: profile.phone || "",
+          account_type: "static",
+          validation_type: "BVN",
+          validation_number: bvn,
+        }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      const success = res.ok && String(json.status ?? "").toLowerCase() === "success";
+      if (success && json.data) {
+        payload = json.data;
+        accountNumber = String(payload.account_number);
+        bankName = String(payload.bank_name ?? "Palmpay");
+        bankCode = String(payload.bank_code ?? "palmpay");
+        accountName = String(payload.account_name ?? accountName);
+        providerRef = json.ref_id || null;
+        webhookUrl = typeof payload.webhook_url === "string" ? payload.webhook_url : null;
+      } else {
+        throw new Error(json.message || "Failed to create virtual account on NCWallet");
+      }
+    }
+
+    // Save/Upsert in supabase virtual_accounts table
+    const { data: saved, error } = await svc
+      .from("virtual_accounts")
+      .upsert({
+        user_id: userId,
+        provider: params.create_new || params.account_to_lookup ? "ncwallet" : "manual",
+        provider_reference: providerRef,
+        account_number: accountNumber,
+        account_name: accountName,
+        bank_code: bankCode,
+        bank_name: bankName,
+        account_type: accountType,
+        status: "active",
+        webhook_url: webhookUrl,
+        meta: payload,
+      }, { onConflict: "user_id" })
+      .select()
+      .single();
+
+    if (error || !saved) {
+      throw new Error(error?.message ?? "Failed to save virtual account record");
+    }
+
+    return {
+      success: true,
+      message: "Virtual account details synced successfully!",
+      data: saved
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || "Failed to sync virtual account"
+    };
   }
 }

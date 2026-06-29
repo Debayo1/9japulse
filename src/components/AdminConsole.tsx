@@ -21,6 +21,7 @@ import {
   updateUserBalanceAdminAction,
   updateTransactionStatusAdminAction,
   promoteUserToAdmin,
+  updateUserVirtualAccountAdminAction,
 } from "@/lib/admin";
 import {
   syncGSubzDataPlansAdmin,
@@ -69,6 +70,14 @@ export default function AdminConsole({
   // Promoted emails form state
   const [promotedEmail, setPromotedEmail] = useState("");
 
+  // Editing state for virtual accounts
+  const [managingVaUserId, setManagingVaUserId] = useState<string | null>(null);
+  const [vaAccountNumber, setVaAccountNumber] = useState("");
+  const [vaBankName, setVaBankName] = useState("Palmpay");
+  const [vaBankCode, setVaBankCode] = useState("palmpay");
+  const [vaLookupNumber, setVaLookupNumber] = useState("");
+  const [vaCreateNew, setVaCreateNew] = useState(false);
+
   // Keys forms states
   const [dbUrl, setDbUrl] = useState("");
   const [selectedProvider, setSelectedProvider] = useState("gsubz");
@@ -114,6 +123,41 @@ export default function AdminConsole({
         setEditingUserId(null);
       } catch (err: any) {
         toast.error(err.message || "Failed to update balance");
+      }
+    });
+  };
+
+  const handleSaveVirtualAccount = (userId: string) => {
+    startTransition(async () => {
+      try {
+        const res = await updateUserVirtualAccountAdminAction(userId, {
+          account_number: vaAccountNumber || undefined,
+          bank_name: vaBankName || undefined,
+          bank_code: vaBankCode || undefined,
+          account_to_lookup: vaLookupNumber || undefined,
+          create_new: vaCreateNew || undefined,
+        });
+
+        if (!res.success) throw new Error(res.message);
+
+        // Update local state
+        setUsers(prev => prev.map(u => {
+          if (u.id === userId) {
+            return { ...u, virtual_accounts: [res.data] };
+          }
+          return u;
+        }));
+
+        toast.success(res.message);
+        setManagingVaUserId(null);
+        // Reset form
+        setVaAccountNumber("");
+        setVaBankName("Palmpay");
+        setVaBankCode("palmpay");
+        setVaLookupNumber("");
+        setVaCreateNew(false);
+      } catch (err: any) {
+        toast.error(err.message || "Failed to sync virtual account");
       }
     });
   };
@@ -476,6 +520,141 @@ export default function AdminConsole({
                             style={{ padding: "0 8px", fontSize: "0.75rem", height: "26px", borderRadius: "8px" }}
                           >
                             X
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Virtual Account Status & Actions */}
+                    <div style={{
+                      borderTop: "1px dashed var(--border)",
+                      paddingTop: "0.625rem",
+                      marginTop: "0.5rem",
+                      fontSize: "0.75rem",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.375rem"
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          {user.virtual_accounts?.[0] ? (
+                            <span style={{ color: "var(--text-secondary)" }}>
+                              <strong>{user.virtual_accounts[0].bank_name}</strong> • {user.virtual_accounts[0].account_number} ({user.virtual_accounts[0].provider})
+                            </span>
+                          ) : (
+                            <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>No Virtual Account</span>
+                          )}
+                        </div>
+                        {managingVaUserId !== user.id ? (
+                          <button
+                            onClick={() => {
+                              setManagingVaUserId(user.id);
+                              setVaAccountNumber(user.virtual_accounts?.[0]?.account_number || "");
+                              setVaBankName(user.virtual_accounts?.[0]?.bank_name || "Palmpay");
+                              setVaBankCode(user.virtual_accounts?.[0]?.bank_code || "palmpay");
+                              setVaLookupNumber("");
+                              setVaCreateNew(false);
+                            }}
+                            className="btn btn-secondary"
+                            style={{ padding: "2px 8px", fontSize: "0.7rem", height: "22px", borderRadius: "6px" }}
+                          >
+                            Manage VA
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setManagingVaUserId(null)}
+                            className="btn btn-secondary"
+                            style={{ padding: "2px 8px", fontSize: "0.7rem", height: "22px", borderRadius: "6px" }}
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+
+                      {managingVaUserId === user.id && (
+                        <div style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0.5rem",
+                          backgroundColor: "var(--bg-base)",
+                          padding: "0.625rem",
+                          borderRadius: "10px",
+                          border: "1px solid var(--border)",
+                          marginTop: "0.25rem"
+                        }}>
+                          {/* Lookup */}
+                          <div>
+                            <label style={{ fontWeight: 700, fontSize: "0.6875rem", display: "block", marginBottom: "2px" }}>Lookup Existing Number (NCWallet)</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 8064225722"
+                              value={vaLookupNumber}
+                              onChange={(e) => {
+                                setVaLookupNumber(e.target.value);
+                                setVaCreateNew(false);
+                              }}
+                              className="input"
+                              style={{ padding: "4px 8px", fontSize: "0.72rem", height: "26px", borderRadius: "6px" }}
+                            />
+                          </div>
+
+                          {/* Request New Toggle */}
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <input
+                              type="checkbox"
+                              id={`create-new-toggle-${user.id}`}
+                              checked={vaCreateNew}
+                              onChange={(e) => {
+                                setVaCreateNew(e.target.checked);
+                                if (e.target.checked) setVaLookupNumber("");
+                              }}
+                              style={{ width: "14px", height: "14px", cursor: "pointer" }}
+                            />
+                            <label htmlFor={`create-new-toggle-${user.id}`} style={{ fontWeight: 700, fontSize: "0.6875rem", cursor: "pointer" }}>
+                              Request BRAND NEW from NCWallet
+                            </label>
+                          </div>
+
+                          {/* Manual Input (only active if not using Lookup or Create New) */}
+                          {!vaLookupNumber && !vaCreateNew && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "4px", borderTop: "1px dashed var(--border)", paddingTop: "4px" }}>
+                              <span style={{ fontWeight: 700, fontSize: "0.6875rem", color: "var(--text-secondary)" }}>Or Update Manually:</span>
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px" }}>
+                                <input
+                                  type="text"
+                                  placeholder="Bank Name"
+                                  value={vaBankName}
+                                  onChange={(e) => setVaBankName(e.target.value)}
+                                  className="input"
+                                  style={{ padding: "4px 8px", fontSize: "0.72rem", height: "26px", borderRadius: "6px" }}
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Bank Code"
+                                  value={vaBankCode}
+                                  onChange={(e) => setVaBankCode(e.target.value)}
+                                  className="input"
+                                  style={{ padding: "4px 8px", fontSize: "0.72rem", height: "26px", borderRadius: "6px" }}
+                                />
+                              </div>
+                              <input
+                                type="text"
+                                placeholder="Account Number"
+                                value={vaAccountNumber}
+                                onChange={(e) => setVaAccountNumber(e.target.value)}
+                                className="input"
+                                style={{ padding: "4px 8px", fontSize: "0.72rem", height: "26px", borderRadius: "6px" }}
+                              />
+                            </div>
+                          )}
+
+                          <button
+                            onClick={() => handleSaveVirtualAccount(user.id)}
+                            className="btn btn-primary"
+                            style={{ width: "100%", height: "26px", fontSize: "0.72rem", borderRadius: "6px" }}
+                            disabled={isPending}
+                          >
+                            {isPending ? "Syncing..." : "Apply Virtual Account"}
                           </button>
                         </div>
                       )}

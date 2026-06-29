@@ -21,7 +21,7 @@ export default async function AdminDashboardPage() {
   const [{ data: users }, { data: txns }, { data: settings }, { data: keys }] = await Promise.all([
     svc
       .from("profiles")
-      .select("id, email, full_name, role, created_at, wallets(balance_withdrawable)")
+      .select("id, email, full_name, role, created_at, wallets(balance_withdrawable), virtual_accounts(*)")
       .order("created_at", { ascending: false }),
     svc
       .from("transactions")
