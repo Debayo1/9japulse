@@ -32,6 +32,120 @@ export default function HomePage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [fullName, setFullName] = useState("User");
 
+  // Pull to refresh states
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isPulling, setIsPulling] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [touchStart, setTouchStart] = useState(0);
+
+  // Perform SWR background sync
+  const performBackgroundSync = async (isManual = false) => {
+    setSyncing(true);
+    setSyncMessage(isManual ? "Refreshing..." : "Syncing...");
+    try {
+      const { data: sessionData } = await supabaseBrowser.auth.getSession();
+      const user = sessionData?.session?.user;
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
+
+      const name = (user.user_metadata?.full_name as string) ?? user.email ?? "User";
+      setFullName(name);
+      localStorage.setItem("vtu_profile_cache", JSON.stringify({ fullName: name }));
+
+      // Get wallet
+      const { data: walletData, error: walletErr } = await (supabaseBrowser
+        .from("wallets")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle() as any);
+
+      if (walletErr) throw walletErr;
+      if (walletData) {
+        const wObj = {
+          id: walletData.id,
+          balance_total: Number(walletData.balance_total),
+          balance_withdrawable: Number(walletData.balance_withdrawable),
+        };
+        setWallet(wObj);
+        localStorage.setItem("vtu_wallet_cache", JSON.stringify(wObj));
+
+        // Get transactions
+        const { data: txnsData, error: txnsErr } = await (supabaseBrowser
+          .from("transactions")
+          .select("*")
+          .eq("wallet_id", walletData.id)
+          .order("created_at", { ascending: false })
+          .limit(2) as any);
+
+        if (txnsErr) throw txnsErr;
+        if (txnsData) {
+          setTransactions(txnsData);
+          localStorage.setItem("vtu_transactions_cache", JSON.stringify(txnsData));
+        }
+
+        // Pre-create virtual account in background if not exists
+        fetch("/api/wallets/virtual-account", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${sessionData?.session?.access_token}`,
+          }
+        }).catch(e => console.warn("Background virtual account creation failed:", e));
+      }
+
+      setSyncMessage(isManual ? "Updated" : "Synced");
+      setTimeout(() => {
+        setSyncing(false);
+        setRefreshing(false);
+        setPullDistance(0);
+      }, 1500);
+    } catch (err) {
+      console.error("SWR Sync failed:", err);
+      setSyncMessage("Sync failed");
+      setTimeout(() => {
+        setSyncing(false);
+        setRefreshing(false);
+        setPullDistance(0);
+      }, 2000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (typeof window !== "undefined" && window.scrollY === 0 && !refreshing) {
+      setTouchStart(e.touches[0].clientY);
+      setIsPulling(true);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isPulling || refreshing) return;
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - touchStart;
+    if (diff > 0) {
+      const distance = Math.min(diff * 0.4, 80);
+      setPullDistance(distance);
+      if (diff > 10 && e.cancelable) {
+        e.preventDefault();
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isPulling || refreshing) return;
+    setIsPulling(false);
+    if (pullDistance > 55) {
+      setRefreshing(true);
+      setPullDistance(55);
+      performBackgroundSync(true);
+    } else {
+      setPullDistance(0);
+    }
+  };
+
   useEffect(() => {
     // 1. Instantly load values from cache to present dashboard immediately
     const cachedWallet = localStorage.getItem("vtu_wallet_cache");
@@ -47,74 +161,7 @@ export default function HomePage() {
       setLoading(false);
     }
 
-    // 2. Perform background sync in the background
-    async function performBackgroundSync() {
-      setSyncing(true);
-      setSyncMessage("Syncing...");
-      try {
-        const { data: sessionData } = await supabaseBrowser.auth.getSession();
-        const user = sessionData?.session?.user;
-        if (!user) {
-          router.replace("/login");
-          return;
-        }
-
-        const name = (user.user_metadata?.full_name as string) ?? user.email ?? "User";
-        setFullName(name);
-        localStorage.setItem("vtu_profile_cache", JSON.stringify({ fullName: name }));
-
-        // Get wallet
-        const { data: walletData, error: walletErr } = await (supabaseBrowser
-          .from("wallets")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle() as any);
-
-        if (walletErr) throw walletErr;
-        if (walletData) {
-          const wObj = {
-            id: walletData.id,
-            balance_total: Number(walletData.balance_total),
-            balance_withdrawable: Number(walletData.balance_withdrawable),
-          };
-          setWallet(wObj);
-          localStorage.setItem("vtu_wallet_cache", JSON.stringify(wObj));
-
-          // Get transactions
-          const { data: txnsData, error: txnsErr } = await (supabaseBrowser
-            .from("transactions")
-            .select("*")
-            .eq("wallet_id", walletData.id)
-            .order("created_at", { ascending: false })
-            .limit(2) as any);
-
-          if (txnsErr) throw txnsErr;
-          if (txnsData) {
-            setTransactions(txnsData);
-            localStorage.setItem("vtu_transactions_cache", JSON.stringify(txnsData));
-          }
-
-          // Pre-create virtual account in background if not exists
-          fetch("/api/wallets/virtual-account", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${sessionData?.session?.access_token}`,
-            }
-          }).catch(e => console.warn("Background virtual account creation failed:", e));
-        }
-
-        setSyncMessage("Synced");
-        setTimeout(() => setSyncing(false), 2000);
-      } catch (err) {
-        console.error("SWR Sync failed:", err);
-        setSyncMessage("Sync failed");
-        setTimeout(() => setSyncing(false), 3000);
-      } finally {
-        setLoading(false);
-      }
-    }
-
+    // 2. Perform SWR background sync
     performBackgroundSync();
 
     // Subscribe to Postgres changes on the wallets table in real-time
@@ -167,7 +214,47 @@ export default function HomePage() {
   }
 
   return (
-    <div className="page" style={{ position: "relative" }}>
+    <div
+      className="page"
+      style={{ position: "relative", overflowX: "hidden" }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Pull to Refresh Spinner Indicator */}
+      <div style={{
+        height: `${pullDistance}px`,
+        opacity: pullDistance > 0 ? 1 : 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: isPulling ? "none" : "height var(--duration-fast) var(--ease-smooth), opacity var(--duration-fast) var(--ease-smooth)",
+        overflow: "hidden",
+        backgroundColor: "rgba(15, 23, 42, 0.4)",
+        borderRadius: "0 0 16px 16px",
+        borderBottom: pullDistance > 0 ? "1px solid var(--border)" : "none",
+        gap: "8px",
+        color: "var(--text-secondary)",
+        fontSize: "0.8rem",
+        fontWeight: 600,
+        width: "100%",
+        boxSizing: "border-box"
+      }}>
+        <div className={`spinner-dot ${refreshing ? "rotating" : ""}`} style={{
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          border: "2px solid var(--color-primary)",
+          borderTopColor: "transparent",
+          transform: `rotate(${pullDistance * 4}deg)`
+        }} />
+        <span>{refreshing ? "Updating balance..." : pullDistance > 55 ? "Release to refresh" : "Pull to refresh"}</span>
+      </div>
+
+      <div style={{
+        transform: `translateY(${refreshing ? 55 : pullDistance * 0.5}px)`,
+        transition: isPulling ? "none" : "transform var(--duration-fast) var(--ease-smooth)"
+      }}>
       {/* Premium Floating Sync Status Pill */}
       {syncing && (
         <div style={{
@@ -291,6 +378,8 @@ export default function HomePage() {
       {/* Promo Wealth Banner */}
       <PromoBanner />
 
+      </div>
+
       <style>{`
         .service-shortcut {
           display: flex;
@@ -318,6 +407,12 @@ export default function HomePage() {
         }
         .pulse-dot {
           animation: pulse 1.2s infinite ease-in-out;
+        }
+        @keyframes rotate {
+          100% { transform: rotate(360deg); }
+        }
+        .rotating {
+          animation: rotate 0.8s linear infinite !important;
         }
       `}</style>
 
