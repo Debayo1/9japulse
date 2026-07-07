@@ -23,6 +23,19 @@ export async function signUp(
   });
 
   if (error) throw new Error(error.message);
+
+  // Auto-confirm email to allow immediate login without verifying first
+  if (data?.user) {
+    try {
+      const svc = createServiceClient();
+      await svc.auth.admin.updateUserById(data.user.id, {
+        email_confirm: true
+      });
+    } catch (e) {
+      console.warn("[9jaPulse] Failed to auto-confirm email on sign up:", e);
+    }
+  }
+
   return data;
 }
 

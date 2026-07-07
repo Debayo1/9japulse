@@ -67,8 +67,8 @@ export default function RegisterPage() {
     startTransition(async () => {
       try {
         await signUp(email, password, fullName, phone, pin);
-        toast.success("Account created successfully! A verification email has been sent.");
-        router.push("/confirm-email");
+        toast.success("Account created successfully! You can now log in.");
+        router.push("/login");
       } catch (err: unknown) {
         toast.error((err as Error).message ?? "Registration failed");
       }
