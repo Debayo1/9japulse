@@ -36,7 +36,7 @@ export default function BottomNav() {
           >
             <Icon
               size={18}
-              weight={isActive ? "fill" : "regular"}
+              weight={isActive ? "duotone" : "regular"}
               aria-hidden="true"
             />
             <span>{label}</span>

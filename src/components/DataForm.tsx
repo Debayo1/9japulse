@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Header from "./Header";
 import Image from "next/image";
-import { Info, WifiHigh, Backspace, CaretRight, X } from "@phosphor-icons/react";
+import { Info, WifiHigh, Backspace, CaretRight, X, Warning } from "@phosphor-icons/react";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import { fetchActiveDataPlans, DataPlanDb } from "@/lib/dataPlans";
+import { detectNetworkPrefix } from "@/lib/network";
 
 interface DataFormProps {
   walletId?: string;
@@ -85,6 +86,7 @@ export default function DataForm({ walletId, initialWithdrawable }: DataFormProp
   const [showPinPad, setShowPinPad] = useState(false);
   const [showPlansSheet, setShowPlansSheet] = useState(false);
   const [activeServiceFilter, setActiveServiceFilter] = useState("");
+  const [mismatchWarning, setMismatchWarning] = useState<{ expected: string; detected: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const [allPlans, setAllPlans] = useState<DataPlanDb[]>([]);
@@ -214,6 +216,11 @@ export default function DataForm({ walletId, initialWithdrawable }: DataFormProp
     setPin(e.target.value.slice(0, 4).replace(/[^0-9]/g, ""));
   };
 
+  const proceedToConfirmation = (targetNetwork: string) => {
+    setPin("");
+    setShowConfirm(true);
+  };
+
   const initiatePurchase = (e: React.FormEvent) => {
     e.preventDefault();
     if (phone.length < 11) {
@@ -228,8 +235,15 @@ export default function DataForm({ walletId, initialWithdrawable }: DataFormProp
       toast.error("Insufficient withdrawable balance");
       return;
     }
-    setPin("");
-    setShowConfirm(true);
+
+    // Network prefix check
+    const detected = detectNetworkPrefix(phone);
+    if (detected && detected !== network) {
+      setMismatchWarning({ expected: network, detected });
+      return;
+    }
+
+    proceedToConfirmation(network);
   };
 
   const triggerExecutePurchase = (targetPin: string) => {
@@ -447,7 +461,7 @@ export default function DataForm({ walletId, initialWithdrawable }: DataFormProp
               color: "var(--text-secondary)",
             }}
           >
-            <Info size={16} style={{ color: "var(--color-primary)" }} />
+            <Info size={16} weight="duotone" style={{ color: "var(--color-primary)" }} />
             <span>
               You will be charged <strong>₦{selectedPlan.price.toLocaleString()}</strong>.
             </span>
@@ -714,7 +728,7 @@ export default function DataForm({ walletId, initialWithdrawable }: DataFormProp
               }}
               disabled={isPending}
             >
-              <Backspace size={22} />
+              <Backspace size={22} weight="duotone" />
             </button>
           </div>
           
@@ -846,6 +860,66 @@ export default function DataForm({ walletId, initialWithdrawable }: DataFormProp
                   })}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ─── Network Mismatch Warning Modal ─────────────────────────── */}
+      {mismatchWarning && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.4)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 110,
+            padding: "1.5rem"
+          }}
+          onClick={() => setMismatchWarning(null)}
+        >
+          <div
+            className="glass animate-scale-up"
+            style={{
+              width: "100%",
+              maxWidth: "400px",
+              backgroundColor: "var(--bg-elevated)",
+              borderRadius: "24px",
+              border: "1.5px solid var(--border)",
+              padding: "1.75rem",
+              boxShadow: "var(--shadow-lg)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--color-warning)", marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Warning size={20} weight="duotone" /> Network Mismatch
+            </h2>
+            <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", lineHeight: 1.5, margin: "0 0 1.5rem 0" }}>
+              The phone number you entered appears to belong to <strong>{mismatchWarning.detected.toUpperCase()}</strong>, but you have selected <strong>{mismatchWarning.expected.toUpperCase()}</strong>.
+              <br /><br />
+              Are you sure you want to proceed with <strong>{mismatchWarning.expected.toUpperCase()}</strong>?
+            </p>
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <button
+                onClick={() => setMismatchWarning(null)}
+                className="btn btn-secondary"
+                style={{ flex: 1, height: "42px", fontSize: "0.875rem" }}
+              >
+                No, Close
+              </button>
+              <button
+                onClick={() => {
+                  const targetNetwork = mismatchWarning.expected;
+                  setMismatchWarning(null);
+                  proceedToConfirmation(targetNetwork);
+                }}
+                className="btn btn-primary"
+                style={{ flex: 1, height: "42px", fontSize: "0.875rem", backgroundColor: "var(--color-warning)", borderColor: "var(--color-warning)" }}
+              >
+                Yes, Continue
+              </button>
             </div>
           </div>
         </div>

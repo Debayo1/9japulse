@@ -134,7 +134,7 @@ export default function Header({
                 }}
                 aria-label="Toggle theme"
               >
-                {dark ? <SunIcon size={18} weight="fill" /> : <Moon size={18} weight="regular" />}
+                {dark ? <SunIcon size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
               </button>
 
               <button
@@ -154,7 +154,7 @@ export default function Header({
                 }}
                 aria-label="Support chat"
               >
-                <ChatDots size={18} weight="regular" />
+                <ChatDots size={18} weight="duotone" />
               </button>
 
               <button
@@ -175,7 +175,7 @@ export default function Header({
                 }}
                 aria-label="Notifications"
               >
-                <Bell size={18} weight="regular" />
+                <Bell size={18} weight="duotone" />
                 <span style={{
                   position: "absolute",
                   top: "7px",
@@ -250,7 +250,7 @@ export default function Header({
                 className="header-btn"
                 aria-label="Toggle theme"
               >
-                {dark ? <SunIcon size={18} weight="fill" /> : <Moon size={18} weight="regular" />}
+                {dark ? <SunIcon size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
               </button>
             </div>
           </>
