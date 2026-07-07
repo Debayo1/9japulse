@@ -418,7 +418,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 
 .nav-item span {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
+  font-weight: 600;
   transition: opacity var(--duration-fast);
 }
 

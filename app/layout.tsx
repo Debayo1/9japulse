@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
-import { Manrope } from "next/font/google";
+import { Outfit } from "next/font/google";
 import { Toaster } from "sonner";
 import AuthSync from "@/components/AuthSync";
 import ThemeSync from "@/components/ThemeSync";
 import "./globals.css";
 
-const manrope = Manrope({
+const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-inter",
   display: "swap",
@@ -37,7 +37,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${manrope.variable} h-full`} suppressHydrationWarning>
+    <html lang="en" className={`${outfit.variable} h-full`} suppressHydrationWarning>
       <body className="min-h-dvh antialiased">
         <Script id="theme-init" strategy="beforeInteractive">{`
           (function () {

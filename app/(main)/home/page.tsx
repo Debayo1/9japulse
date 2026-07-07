@@ -271,7 +271,7 @@ export default function HomePage() {
                 </div>
                 <span
                   style={{
-                    fontSize: "0.6875rem",
+                    fontSize: "0.75rem",
                     fontWeight: 600,
                     color: "var(--text-secondary)",
                     textAlign: "center",
