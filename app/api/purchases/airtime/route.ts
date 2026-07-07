@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createRequestClient, createServiceClient } from "@/lib/supabaseServer";
 import { getWallet, applyTransaction } from "@/lib/ledger";
 import { gsubzPurchaseAirtime } from "@/lib/providers/gsubz";
@@ -19,14 +19,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized session" }, { status: 401 });
     }
 
-    const { network, phone, amount, pin } = await req.json();
+    const { network, phone, amount, pin, idempotency_key } = await req.json();
 
     // ── 2. Basic validation ──────────────────────────────────────────────────
     if (!network || !phone || typeof amount !== "number" || amount <= 0 || !pin) {
       return NextResponse.json({ error: "Invalid parameters" }, { status: 400 });
     }
 
-    // ── 3. PIN Verification (fetch from public.profiles first) ────────────────
+    // ── 3. PIN Verification ──────────────────────────────────────────────────
     const { data: profile } = await (reqClient.supabase as any)
       .from("profiles")
       .select("pin")
@@ -52,19 +52,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Insufficient withdrawable balance" }, { status: 400 });
     }
 
-    // ── 5. Deduct funds (status = pending) ───────────────────────────────────
+    // ── 5. Generate request_id for idempotency if not provided ───────────────
+    const requestId = idempotency_key ?? crypto.randomUUID();
+
+    // ── 6. Deduct funds atomically (with idempotency) ────────────────────────
     const ledgerRes = await applyTransaction(wallet.id, {
       service_type: "airtime",
       amount,
-      description: `Airtime purchase for ${phone} (${mappedNetwork})`,
+      description: "Airtime purchase for " + phone + " (" + mappedNetwork + ")",
       status: "pending",
+      request_id: requestId,
     });
 
     const txnId = ledgerRes.transaction.id;
-    const svc = createServiceClient(); // service role for updating transaction status
+
+    // If this was an idempotent replay, return the existing result
+    if (ledgerRes.idempotent) {
+      return NextResponse.json({
+        success: true,
+        reference: ledgerRes.transaction.reference,
+        idempotent: true,
+      });
+    }
+
+    const svc = createServiceClient();
 
     try {
-      // ── 6. Call Payment Provider (GSubz) ───────────────────────────────────
+      // ── 7. Call Payment Provider (GSubz) ───────────────────────────────────
       const providerRes = await gsubzPurchaseAirtime({
         network: network.toLowerCase(),
         phone,
@@ -83,15 +97,16 @@ export async function POST(req: NextRequest) {
         // Provider returned a failure — refund
         await (svc as any)
           .from("transactions")
-          .update({ status: "failed", description: `Failed: ${providerRes.message}` })
+          .update({ status: "failed", description: "Failed: " + providerRes.message })
           .eq("id", txnId);
 
         await applyTransaction(wallet.id, {
           service_type: "refund",
           amount,
-          description: `Refund: Failed airtime purchase for ${phone}`,
+          description: "Refund: Failed airtime purchase for " + phone,
           status: "success",
           reference: txnId,
+          request_id: "refund-" + requestId,
         });
 
         return NextResponse.json({ error: providerRes.message }, { status: 400 });
@@ -101,15 +116,16 @@ export async function POST(req: NextRequest) {
       const errMsg = (providerError as Error).message ?? "Provider connection error";
       await (svc as any)
         .from("transactions")
-        .update({ status: "failed", description: `Failed: ${errMsg}` })
+        .update({ status: "failed", description: "Failed: " + errMsg })
         .eq("id", txnId);
 
       await applyTransaction(wallet.id, {
         service_type: "refund",
         amount,
-        description: `Refund: Failed airtime purchase for ${phone}`,
+        description: "Refund: Failed airtime purchase for " + phone,
         status: "success",
         reference: txnId,
+        request_id: "refund-" + requestId,
       });
 
       return NextResponse.json({ error: errMsg }, { status: 500 });

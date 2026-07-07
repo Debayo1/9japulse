@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createRequestClient, createServiceClient } from "@/lib/supabaseServer";
 import { getWallet, applyTransaction } from "@/lib/ledger";
 import { gsubzPurchaseData } from "@/lib/providers/gsubz";
@@ -48,14 +48,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized session" }, { status: 401 });
     }
 
-    const { network, phone, planId, amount, pin } = await req.json();
+    const { network, phone, planId, amount, pin, idempotency_key } = await req.json();
 
     // ── 2. Basic validation ──────────────────────────────────────────────────
     if (!network || !phone || !planId || typeof amount !== "number" || amount <= 0 || !pin) {
       return NextResponse.json({ error: "Invalid parameters" }, { status: 400 });
     }
 
-    // ── 3. PIN Verification (fetch from profiles first) ──────────────────────
+    // ── 3. PIN Verification ──────────────────────────────────────────────────
     const { data: profile } = await (reqClient.supabase as any)
       .from("profiles")
       .select("pin")
@@ -94,12 +94,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Invalid data plan selected from database" }, { status: 400 });
       }
 
-      serviceID = dbPlan.service; // e.g. "mtn_sme"
-      planValue = dbPlan.plan_value; // e.g. "500mb"
+      serviceID = dbPlan.service;
+      planValue = dbPlan.plan_value;
       purchaseAmount = Number(dbPlan.price);
-      planLabel = dbPlan.display_name || `${dbPlan.full_service_name || dbPlan.service} - ${dbPlan.plan_value}`;
+      planLabel = dbPlan.display_name || (dbPlan.full_service_name || dbPlan.service) + " - " + dbPlan.plan_value;
     } else {
-      // Fallback to static plans definition
       const staticList = STATIC_DATA_PLANS[network.toLowerCase()] || [];
       const staticPlan = staticList.find((p) => p.id === planId);
       if (staticPlan) {
@@ -114,19 +113,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Insufficient withdrawable balance" }, { status: 400 });
     }
 
-    // ── 5. Deduct funds (status = pending) ───────────────────────────────────
+    // ── 5. Generate request_id for idempotency ───────────────────────────────
+    const requestId = idempotency_key ?? crypto.randomUUID();
+
+    // ── 6. Deduct funds atomically (with idempotency) ────────────────────────
     const ledgerRes = await applyTransaction(wallet.id, {
       service_type: "data",
       amount: purchaseAmount,
-      description: `Data subscription: ${planLabel} for ${phone}`,
+      description: "Data subscription: " + planLabel + " for " + phone,
       status: "pending",
+      request_id: requestId,
     });
 
     const txnId = ledgerRes.transaction.id;
+
+    if (ledgerRes.idempotent) {
+      return NextResponse.json({
+        success: true,
+        reference: ledgerRes.transaction.reference,
+        idempotent: true,
+      });
+    }
+
     const svc = createServiceClient();
 
     try {
-      // ── 6. Call Payment Provider (GSubz) ─────────────────────────────────
+      // ── 7. Call Payment Provider (GSubz) ─────────────────────────────────
       const providerRes = await gsubzPurchaseData({
         network: serviceID,
         phone,
@@ -145,15 +157,16 @@ export async function POST(req: NextRequest) {
       } else {
         await (svc as any)
           .from("transactions")
-          .update({ status: "failed", description: `Failed: ${providerRes.message}` })
+          .update({ status: "failed", description: "Failed: " + providerRes.message })
           .eq("id", txnId);
 
         await applyTransaction(wallet.id, {
           service_type: "refund",
           amount: purchaseAmount,
-          description: `Refund: Failed data purchase for ${phone}`,
+          description: "Refund: Failed data purchase for " + phone,
           status: "success",
           reference: txnId,
+          request_id: "refund-" + requestId,
         });
 
         return NextResponse.json({ error: providerRes.message }, { status: 400 });
@@ -162,15 +175,16 @@ export async function POST(req: NextRequest) {
       const errMsg = (providerError as Error).message ?? "Provider connection error";
       await (svc as any)
         .from("transactions")
-        .update({ status: "failed", description: `Failed: ${errMsg}` })
+        .update({ status: "failed", description: "Failed: " + errMsg })
         .eq("id", txnId);
 
       await applyTransaction(wallet.id, {
         service_type: "refund",
         amount: purchaseAmount,
-        description: `Refund: Failed data purchase for ${phone}`,
+        description: "Refund: Failed data purchase for " + phone,
         status: "success",
         reference: txnId,
+        request_id: "refund-" + requestId,
       });
 
       return NextResponse.json({ error: errMsg }, { status: 500 });

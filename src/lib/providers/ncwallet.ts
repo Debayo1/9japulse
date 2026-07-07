@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { getProviderKey } from "../providerKeys";
 
@@ -36,11 +36,11 @@ export async function ncwalletPurchaseAirtime(
   const apiKey = await getProviderKey("ncwallet", "api_key");
   const baseUrl = process.env.NCWALLET_BASE_URL ?? "https://api.ncwallet.ng";
 
-  const res = await fetch(`${baseUrl}/airtime/purchase`, {
+  const res = await fetch(baseUrl + "/airtime/purchase", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+      "Authorization": apiKey, // NCWallet uses raw API key, not Bearer
     },
     body: JSON.stringify({
       network: params.network,
@@ -68,11 +68,11 @@ export async function ncwalletPurchaseData(
   const apiKey = await getProviderKey("ncwallet", "api_key");
   const baseUrl = process.env.NCWALLET_BASE_URL ?? "https://api.ncwallet.ng";
 
-  const res = await fetch(`${baseUrl}/data/purchase`, {
+  const res = await fetch(baseUrl + "/data/purchase", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+      "Authorization": apiKey,
     },
     body: JSON.stringify({
       network: params.network,
@@ -119,13 +119,13 @@ export async function ncwalletCreateVirtualAccount(
     throw new Error("Missing NCWallet BVN. Add NCWALLET_BVN or save ncwallet/bvn in provider keys.");
   }
 
-  const res = await fetch(`${baseUrl}/bank/create`, {
+  const res = await fetch(baseUrl + "/bank/create", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Accept": "application/json",
       "trnx_pin": trnxPin,
-      "Authorization": apiKey,
+      "Authorization": apiKey, // NCWallet uses raw API key in Authorization header
     },
     body: JSON.stringify({
       bank_code: "palmpay",

@@ -1,12 +1,29 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { Lock, Backspace, Fingerprint } from "@phosphor-icons/react";
 import { checkHasPasscodeAction, verifyAppPasscodeAction, signOut } from "@/lib/auth";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
+// --- WebAuthn helpers ---------------------------------------------------------
+function base64UrlToBytes(base64url: string): BufferSource {
+  const base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+  return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+}
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+  const base64 = btoa(String.fromCharCode(...bytes));
+  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function generateChallenge(): BufferSource {
+  return crypto.getRandomValues(new Uint8Array(32));
+}
+
+// --- Component ----------------------------------------------------------------
 export default function PasscodeLockGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -17,61 +34,130 @@ export default function PasscodeLockGuard({ children }: { children: React.ReactN
   const [passcode, setPasscode] = useState("");
   const [errorCount, setErrorCount] = useState(0);
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
+  const [biometricsSupported, setBiometricsSupported] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
   // Check if route is public
-  const isPublicRoute = 
-    pathname === "/" || 
-    pathname === "/login" || 
-    pathname === "/register" || 
+  const isPublicRoute =
+    pathname === "/" ||
+    pathname === "/login" ||
+    pathname === "/register" ||
     pathname === "/reset-password";
 
-  const triggerBiometricPrompt = async (uid: string) => {
-    try {
-      const bioEnabled = localStorage.getItem(`biometrics_enabled_${uid}`) === "true";
-      if (!bioEnabled) {
-        toast.error("Biometric authentication is not enabled on this device");
-        return;
-      }
-
-      if (typeof window !== "undefined" && !window.PublicKeyCredential) {
-        toast.error("Biometrics is not supported on this browser or device");
-        return;
-      }
-
-      toast.loading("Verifying biometrics...", { id: "biometrics" });
-      
-      // Simulate biometric check animation delay
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      
-      setUnlocked(true);
-      sessionStorage.setItem("app_unlocked", "true");
-      toast.success("Welcome back!", { id: "biometrics" });
-    } catch {
-      toast.error("Biometric verification failed", { id: "biometrics" });
+  // -- Check if WebAuthn is available ----------------------------------------
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.PublicKeyCredential) {
+      setBiometricsSupported(true);
     }
-  };
+  }, []);
 
+  // -- Biometric unlock via WebAuthn ------------------------------------------
+  const triggerBiometricPrompt = useCallback(async (uid: string) => {
+    if (!window.PublicKeyCredential) {
+      toast.error("Biometrics is not supported on this browser or device");
+      return;
+    }
+
+    // Get stored credential ID
+    const storedCredId = localStorage.getItem("webauthn_cred_id_" + uid);
+
+    if (!storedCredId) {
+      // No credential enrolled � offer enrollment
+      toast.loading("Setting up biometric authentication...", { id: "webauthn" });
+      try {
+        const challenge = generateChallenge();
+        const publicKey: PublicKeyCredentialCreationOptions = {
+          challenge,
+          rp: { name: "9jaPulse", id: window.location.hostname },
+          user: {
+            id: base64UrlToBytes(uid.replace(/-/g, "")),
+            name: uid,
+            displayName: "9jaPulse User",
+          },
+          pubKeyCredParams: [
+            { type: "public-key", alg: -7 }, // ES256
+            { type: "public-key", alg: -257 }, // RS256
+          ],
+          authenticatorSelection: {
+            authenticatorAttachment: "platform",
+            userVerification: "required",
+          },
+          timeout: 30000,
+        };
+
+        const credential = await navigator.credentials.create({ publicKey }) as PublicKeyCredential;
+
+        // Store the credential ID for future unlocks
+        localStorage.setItem("webauthn_cred_id_" + uid, credential.id);
+        localStorage.setItem("biometrics_enabled_" + uid, "true");
+        setBiometricsEnabled(true);
+
+        // Auto-unlock after successful enrollment
+        setUnlocked(true);
+        sessionStorage.setItem("app_unlocked", "true");
+        toast.success("Biometric authentication enrolled and verified!", { id: "webauthn" });
+      } catch (err: any) {
+        if (err.name === "NotAllowedError") {
+          toast.error("Biometric enrollment was cancelled", { id: "webauthn" });
+        } else {
+          toast.error("Biometric enrollment failed: " + (err.message || "Unknown error"), { id: "webauthn" });
+        }
+      }
+      return;
+    }
+
+    // Credential exists � attempt authentication
+    toast.loading("Verifying biometrics...", { id: "webauthn" });
+    try {
+      const challenge = generateChallenge();
+      const publicKey: PublicKeyCredentialRequestOptions = {
+        challenge,
+        allowCredentials: [
+          {
+            id: base64UrlToBytes(storedCredId),
+            type: "public-key",
+            transports: ["internal", "platform"] as AuthenticatorTransport[],
+          },
+        ],
+        userVerification: "required",
+        timeout: 30000,
+      };
+
+      const assertion = await navigator.credentials.get({ publicKey }) as PublicKeyCredential;
+
+      if (assertion) {
+        setUnlocked(true);
+        sessionStorage.setItem("app_unlocked", "true");
+        toast.success("Welcome back!", { id: "webauthn" });
+      }
+    } catch (err: any) {
+      if (err.name === "NotAllowedError") {
+        toast.error("Biometric verification was cancelled", { id: "webauthn" });
+      } else {
+        toast.error("Biometric verification failed: " + (err.message || "Unknown error"), { id: "webauthn" });
+      }
+    }
+  }, []);
+
+  // -- Check passcode and biometric status on mount --------------------------
   useEffect(() => {
     if (isPublicRoute) return;
 
-    // Check session storage first
     const isUnlocked = sessionStorage.getItem("app_unlocked") === "true";
     if (isUnlocked) {
       setUnlocked(true);
       return;
     }
 
-    // Check if passcode is configured
     async function checkPasscode() {
       try {
         const { data: sessionData } = await supabaseBrowser.auth.getSession();
         const user = sessionData?.session?.user;
         if (user) {
           setUserId(user.id);
-          const isBioEnabled = localStorage.getItem(`biometrics_enabled_${user.id}`) === "true";
+          const isBioEnabled = localStorage.getItem("biometrics_enabled_" + userId) === "true";
           setBiometricsEnabled(isBioEnabled);
-          if (isBioEnabled) {
+          if (isBioEnabled && biometricsSupported) {
             // Auto trigger biometric scan
             setTimeout(() => {
               triggerBiometricPrompt(user.id);
@@ -82,17 +168,15 @@ export default function PasscodeLockGuard({ children }: { children: React.ReactN
         const res = await checkHasPasscodeAction();
         setHasPasscode(res.hasPasscode);
         if (!res.hasPasscode) {
-          // No passcode configured, auto-unlock
           setUnlocked(true);
           sessionStorage.setItem("app_unlocked", "true");
         }
       } catch {
-        // Fallback to unlock if DB check fails
         setUnlocked(true);
       }
     }
     checkPasscode();
-  }, [pathname, isPublicRoute]);
+  }, [pathname, isPublicRoute, biometricsSupported, triggerBiometricPrompt]);
 
   const handleKeyPress = (num: string) => {
     if (passcode.length >= 4) return;
@@ -100,7 +184,6 @@ export default function PasscodeLockGuard({ children }: { children: React.ReactN
     setPasscode(newPass);
 
     if (newPass.length === 4) {
-      // Auto-submit
       startTransition(async () => {
         try {
           const res = await verifyAppPasscodeAction(newPass);
@@ -113,7 +196,7 @@ export default function PasscodeLockGuard({ children }: { children: React.ReactN
             setErrorCount(prev => prev + 1);
             toast.error("Incorrect passcode. Please try again.");
           }
-        } catch (err: any) {
+        } catch {
           toast.error("Failed to verify passcode");
           setPasscode("");
         }
@@ -132,7 +215,7 @@ export default function PasscodeLockGuard({ children }: { children: React.ReactN
         sessionStorage.removeItem("app_unlocked");
         toast.success("Logged out successfully");
         router.push("/login");
-      } catch (err: any) {
+      } catch {
         toast.error("Failed to log out");
       }
     });
@@ -243,15 +326,13 @@ export default function PasscodeLockGuard({ children }: { children: React.ReactN
           </button>
         ))}
 
-        {/* Biometrics Toggle / Activation key */}
+        {/* Biometrics button � uses real WebAuthn API */}
         <button
           onClick={() => {
             if (userId) {
-              if (biometricsEnabled) {
-                triggerBiometricPrompt(userId);
-              } else {
-                toast.info("Biometrics not connected. Navigate to Security settings to link your fingerprint/Face ID.");
-              }
+              triggerBiometricPrompt(userId);
+            } else {
+              toast.error("Please log in first to set up biometrics");
             }
           }}
           className="squishy"
@@ -259,16 +340,22 @@ export default function PasscodeLockGuard({ children }: { children: React.ReactN
             width: 64,
             height: 64,
             borderRadius: "50%",
-            border: biometricsEnabled ? "1.5px solid var(--color-success)" : "none",
-            background: "none",
+            border: biometricsEnabled ? "1.5px solid var(--color-success)" : "1.5px solid var(--border)",
+            background: "var(--bg-elevated)",
             color: biometricsEnabled ? "var(--color-success)" : "var(--text-secondary)",
-            opacity: biometricsEnabled ? 1 : 0.4,
-            cursor: "pointer",
+            opacity: biometricsSupported ? 1 : 0.4,
+            cursor: biometricsSupported ? "pointer" : "not-allowed",
             display: "flex",
             alignItems: "center",
             justifyContent: "center"
           }}
-          title={biometricsEnabled ? "Biometric Unlock" : "Biometrics disabled"}
+          title={
+            !biometricsSupported
+              ? "Biometrics not supported on this device"
+              : biometricsEnabled
+                ? "Tap to unlock with fingerprint / face"
+                : "Tap to set up fingerprint / face unlock"
+          }
         >
           <Fingerprint size={28} />
         </button>

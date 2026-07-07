@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { createServiceClient } from "./supabaseServer";
 import { ensureDbColumnsExist } from "./dbAdmin";
@@ -7,6 +7,8 @@ import { ncwalletCreateVirtualAccount } from "./providers/ncwallet";
 import type { Database } from "./database.types";
 
 type VirtualAccountRow = any;
+
+const MOCK_VA_ENABLED = process.env.NEXT_PUBLIC_MOCK_VA === "1" || process.env.MOCK_VA === "1";
 
 export async function getDepositMeta(userId: string) {
   await ensureDbColumnsExist();
@@ -92,21 +94,31 @@ export async function getOrCreateVirtualAccount(userId: string) {
         apiSuccess = true;
       }
     } catch (apiErr) {
-      console.warn("[9jaPulse] NCWallet API request failed, falling back to local mock virtual account generation:", apiErr);
+      console.warn("[9jaPulse] NCWallet API request failed:", apiErr);
     }
   } else {
-    console.warn("[9jaPulse] NCWallet BVN not configured. Falling back to local mock virtual account generation.");
+    console.warn("[9jaPulse] NCWallet BVN not configured.");
   }
 
-  // Fallback to local mock virtual account (matching Laravel's local fallback logic)
-  if (!apiSuccess) {
+  // Fallback to mock virtual account ONLY if explicitly enabled via env flag
+  if (!apiSuccess && MOCK_VA_ENABLED) {
+    console.warn("[9jaPulse] Generating MOCK virtual account (NEXT_PUBLIC_MOCK_VA=1). Deposits to mock accounts will be lost.");
     const randomDigits = Math.floor(10000000 + Math.random() * 90000000);
-    accountNumber = `80${randomDigits}`;
+    accountNumber = "80" + String(randomDigits);
     bankName = "Palmpay (Mock)";
     bankCode = "palmpay";
     accountType = "static";
     accountNameFromProvider = accountName;
-    payload = { mock: true, note: "Generated locally due to missing or failed NCWallet connection." };
+    payload = {
+      mock: true,
+      note: "Mock virtual account — deposits to this account will NOT be credited automatically.",
+    };
+  } else if (!apiSuccess && !MOCK_VA_ENABLED) {
+    // No mock fallback — throw a clear error so the caller knows VA creation failed
+    throw new Error(
+      "Virtual account creation failed. NCWallet API is unreachable and mock accounts are disabled. " +
+      "Set NEXT_PUBLIC_MOCK_VA=1 to enable mock accounts for development, or fix the NCWallet integration."
+    );
   }
 
   const { data: saved, error } = await svc

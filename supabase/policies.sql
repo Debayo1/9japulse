@@ -1,4 +1,4 @@
--- =============================================================================
+﻿-- =============================================================================
 -- 9jaPulse Row Level Security Policies
 -- Run AFTER schema.sql
 -- =============================================================================
@@ -51,3 +51,39 @@ alter table provider_keys enable row level security;
 create policy "No client access to provider_keys"
   on provider_keys for all
   using (false);
+
+-- ─── virtual_accounts ─────────────────────────────────────────────────────────
+alter table virtual_accounts enable row level security;
+
+create policy "Users can read own virtual account"
+  on virtual_accounts for select
+  using (auth.uid() = user_id);
+
+create policy "No direct client virtual account writes"
+  on virtual_accounts for all
+  using (false)
+  with check (false);
+
+-- ─── platform_settings ────────────────────────────────────────────────────────
+alter table platform_settings enable row level security;
+
+create policy "Anyone can read platform settings"
+  on platform_settings for select
+  using (true);
+
+create policy "No direct client platform_settings writes"
+  on platform_settings for all
+  using (false)
+  with check (false);
+
+-- ─── data_plans ───────────────────────────────────────────────────────────────
+alter table data_plans enable row level security;
+
+create policy "Anyone can read data plans"
+  on data_plans for select
+  using (true);
+
+create policy "No direct client data_plans writes"
+  on data_plans for all
+  using (false)
+  with check (false);
