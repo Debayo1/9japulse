@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { DeviceMobile, Globe, Lightning, Television, Student, Coins, Books } from "@phosphor-icons/react";
+import { Smartphone, World, CloudLightning, Airplay, Book, CoinStack, Certificate } from "@duo-icons/react";
 import WalletCard from "@/components/WalletCard";
 import { HistoryList } from "@/components/HistoryList";
 import { SkeletonWallet, SkeletonList, SkeletonServices } from "@/components/SkeletonLoader";
@@ -12,13 +12,13 @@ import PromoBanner from "@/components/PromoBanner";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 const SERVICES = [
-  { label: "Airtime",     Icon: DeviceMobile, href: "/services/airtime",      color: "#EF4444" },
-  { label: "Data",        Icon: Globe,        href: "/services/data",         color: "#7C3AED" },
-  { label: "Electricity", Icon: Lightning,    href: "/services/electricity",  color: "#F59E0B" },
-  { label: "Cable TV",    Icon: Television,   href: "/services/cable",        color: "#10B981" },
-  { label: "Education",   Icon: Student,      href: "/services/education",    color: "#3B82F6" },
-  { label: "Betting",     Icon: Coins,        href: "/services/betting",      color: "#06B6D4" },
-  { label: "Exam PIN",    Icon: Books,        href: "/services/exam",         color: "#F97316" },
+  { label: "Airtime",     Icon: Smartphone,     href: "/services/airtime",      color: "#EF4444" },
+  { label: "Data",        Icon: World,          href: "/services/data",         color: "#7C3AED" },
+  { label: "Electricity", Icon: CloudLightning, href: "/services/electricity",  color: "#F59E0B" },
+  { label: "Cable TV",    Icon: Airplay,        href: "/services/cable",        color: "#10B981" },
+  { label: "Education",   Icon: Book,           href: "/services/education",    color: "#3B82F6" },
+  { label: "Betting",     Icon: CoinStack,      href: "/services/betting",      color: "#06B6D4" },
+  { label: "Exam PIN",    Icon: Certificate,    href: "/services/exam",         color: "#F97316" },
 ] as const;
 
 export default function HomePage() {
@@ -267,7 +267,7 @@ export default function HomePage() {
                   }}
                   className="shortcut-icon-wrapper"
                 >
-                  <Icon size={20} weight="duotone" color={color} />
+                  <Icon size={20} />
                 </div>
                 <span
                   style={{

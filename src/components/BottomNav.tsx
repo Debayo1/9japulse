@@ -2,18 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  House,
-  SquaresFour,
-  CreditCard,
-  UserCircle,
-} from "@phosphor-icons/react";
+import { Dashboard, AppDots, CreditCard, User } from "@duo-icons/react";
 
 const NAV_ITEMS = [
-  { label: "Home",     href: "/home",     Icon: House       },
-  { label: "Services", href: "/services", Icon: SquaresFour },
-  { label: "Card",     href: "/card",     Icon: CreditCard  },
-  { label: "Me",       href: "/me",       Icon: UserCircle  },
+  { label: "Home",     href: "/home",     Icon: Dashboard },
+  { label: "Services", href: "/services", Icon: AppDots   },
+  { label: "Card",     href: "/card",     Icon: CreditCard },
+  { label: "Me",       href: "/me",       Icon: User       },
 ] as const;
 
 export default function BottomNav() {
@@ -36,7 +31,6 @@ export default function BottomNav() {
           >
             <Icon
               size={18}
-              weight={isActive ? "duotone" : "regular"}
               aria-hidden="true"
             />
             <span>{label}</span>

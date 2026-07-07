@@ -3,11 +3,8 @@
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
-  Moon,
-  Sun as SunIcon,
-  ChatDots,
-  Bell,
 } from "@phosphor-icons/react";
+import { Sun, MoonStars, Message3, Bell } from "@duo-icons/react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { applyThemePreference, getStoredThemePreference, resolveTheme } from "@/lib/theme";
@@ -134,7 +131,7 @@ export default function Header({
                 }}
                 aria-label="Toggle theme"
               >
-                {dark ? <SunIcon size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
+                {dark ? <Sun size={18} /> : <MoonStars size={18} />}
               </button>
 
               <button
@@ -154,7 +151,7 @@ export default function Header({
                 }}
                 aria-label="Support chat"
               >
-                <ChatDots size={18} weight="duotone" />
+                <Message3 size={18} />
               </button>
 
               <button
@@ -175,7 +172,7 @@ export default function Header({
                 }}
                 aria-label="Notifications"
               >
-                <Bell size={18} weight="duotone" />
+                <Bell size={18} />
                 <span style={{
                   position: "absolute",
                   top: "7px",
@@ -250,7 +247,7 @@ export default function Header({
                 className="header-btn"
                 aria-label="Toggle theme"
               >
-                {dark ? <SunIcon size={18} weight="duotone" /> : <Moon size={18} weight="duotone" />}
+                {dark ? <Sun size={18} /> : <MoonStars size={18} />}
               </button>
             </div>
           </>

@@ -4,16 +4,9 @@ import { useEffect, useState, startTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
-  UserCircle,
   CaretRight,
-  SignOut,
-  Gear,
-  Question,
-  ShieldCheck,
-  Bell,
-  ShareNetwork,
-  Wrench
 } from "@phosphor-icons/react";
+import { User, Settings, IdCard, BellBadge, Discount, Award, Message2, Toggle } from "@duo-icons/react";
 import { signOut } from "@/lib/auth";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import Link from "next/link";
@@ -152,7 +145,7 @@ export default function MePage() {
 
       {/* Page Header */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1.5rem" }}>
-        <UserCircle size={24} weight="duotone" color="var(--color-primary)" />
+        <span style={{ color: "var(--color-primary)", display: "inline-flex" }}><User size={24} /></span>
         <h1 style={{ fontSize: "1.375rem", fontWeight: 700 }}>My Profile</h1>
       </div>
 
@@ -219,7 +212,7 @@ export default function MePage() {
             className="card"
           >
             <div style={{ width: 32, height: 32, borderRadius: 10, background: "color-mix(in srgb, var(--color-primary) 10%, transparent)", display: "flex", alignItems: "center", color: "var(--color-primary)", justifyContent: "center" }}>
-              <Gear size={18} weight="duotone" />
+              <Settings size={18} />
             </div>
             <span style={{ flex: 1, fontWeight: 600, fontSize: "0.8125rem", color: "var(--text-primary)" }}>Account Settings</span>
             <CaretRight size={14} weight="bold" color="var(--text-muted)" />
@@ -231,7 +224,7 @@ export default function MePage() {
             className="card"
           >
             <div style={{ width: 32, height: 32, borderRadius: 10, background: "color-mix(in srgb, var(--color-success) 10%, transparent)", display: "flex", alignItems: "center", color: "var(--color-success)", justifyContent: "center" }}>
-              <ShieldCheck size={18} weight="duotone" />
+              <IdCard size={18} />
             </div>
             <span style={{ flex: 1, fontWeight: 600, fontSize: "0.8125rem", color: "var(--text-primary)" }}>Security PIN & Passcode</span>
             <CaretRight size={14} weight="bold" color="var(--text-muted)" />
@@ -243,7 +236,7 @@ export default function MePage() {
             className="card"
           >
             <div style={{ width: 32, height: 32, borderRadius: 10, background: "color-mix(in srgb, var(--color-warning) 10%, transparent)", display: "flex", alignItems: "center", color: "var(--color-warning)", justifyContent: "center" }}>
-              <Bell size={18} weight="duotone" />
+              <BellBadge size={18} />
             </div>
             <span style={{ flex: 1, fontWeight: 600, fontSize: "0.8125rem", color: "var(--text-primary)" }}>Notifications</span>
             <CaretRight size={14} weight="bold" color="var(--text-muted)" />
@@ -263,7 +256,7 @@ export default function MePage() {
             className="card"
           >
             <div style={{ width: 32, height: 32, borderRadius: 10, background: "color-mix(in srgb, var(--color-accent) 10%, transparent)", display: "flex", alignItems: "center", color: "var(--color-accent)", justifyContent: "center" }}>
-              <ShareNetwork size={18} weight="duotone" />
+              <Discount size={18} />
             </div>
             <span style={{ flex: 1, fontWeight: 600, fontSize: "0.8125rem", color: "var(--text-primary)" }}>Refer & Earn Program</span>
             <CaretRight size={14} weight="bold" color="var(--text-muted)" />
@@ -276,7 +269,7 @@ export default function MePage() {
               className="card"
             >
               <div style={{ width: 32, height: 32, borderRadius: 10, background: "color-mix(in srgb, var(--color-primary) 10%, transparent)", display: "flex", alignItems: "center", color: "var(--color-primary)", justifyContent: "center" }}>
-                <Wrench size={18} weight="duotone" />
+                <Award size={18} />
               </div>
               <span style={{ flex: 1, fontWeight: 600, fontSize: "0.8125rem", color: "var(--text-primary)" }}>Admin Panel Dashboard</span>
               <CaretRight size={14} weight="bold" color="var(--text-muted)" />
@@ -297,7 +290,7 @@ export default function MePage() {
             className="card"
           >
             <div style={{ width: 32, height: 32, borderRadius: 10, background: "color-mix(in srgb, var(--color-info) 10%, transparent)", display: "flex", alignItems: "center", color: "var(--color-info)", justifyContent: "center" }}>
-              <Question size={18} weight="duotone" />
+              <Message2 size={18} />
             </div>
             <span style={{ flex: 1, fontWeight: 600, fontSize: "0.8125rem", color: "var(--text-primary)" }}>Help & Support Center</span>
             <CaretRight size={14} weight="bold" color="var(--text-muted)" />
@@ -310,7 +303,7 @@ export default function MePage() {
         className="btn btn-secondary btn-full"
         style={{ color: "var(--color-danger)", borderColor: "hsl(0 72% 51% / 0.2)", height: "46px" }}
       >
-        <SignOut size={18} weight="duotone" />
+        <Toggle size={18} />
         Sign Out
       </button>
 
