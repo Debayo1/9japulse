@@ -155,7 +155,7 @@ export default function PasscodeLockGuard({ children }: { children: React.ReactN
         const user = sessionData?.session?.user;
         if (user) {
           setUserId(user.id);
-          const isBioEnabled = localStorage.getItem("biometrics_enabled_" + userId) === "true";
+          const isBioEnabled = localStorage.getItem("biometrics_enabled_" + user.id) === "true";
           setBiometricsEnabled(isBioEnabled);
           if (isBioEnabled && biometricsSupported) {
             // Auto trigger biometric scan
