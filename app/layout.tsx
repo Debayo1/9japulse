@@ -19,6 +19,14 @@ export const metadata: Metadata = {
   applicationName: "9jaPulse",
   keywords: ["VTU", "airtime", "data", "wallet", "Nigeria", "fintech"],
   manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "9jaPulse",
+  },
+  icons: {
+    apple: "/icons/icon-192.png",
+  },
 };
 
 export const viewport: Viewport = {
