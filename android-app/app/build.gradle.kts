@@ -5,10 +5,10 @@ plugins {
 }
 
 android {
-    namespace = "com.example.9japulse"
+    namespace = "com.example.ninjapulse"
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.example.9japulse"
+        applicationId = "com.example.ninjapulse"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

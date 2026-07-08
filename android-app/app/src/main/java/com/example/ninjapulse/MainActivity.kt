@@ -1,4 +1,4 @@
-package com.example.9japulse
+package com.example.ninjapulse
 
 import android.annotation.SuppressLint
 import android.os.Bundle
