@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { toast } from "sonner";
 import { ArrowRight, DeviceMobile, ShieldCheck, Lightning, Trophy, DownloadSimple, HardDrive } from "@phosphor-icons/react";
+import IosInstallPrompt from "@/components/IosInstallPrompt";
 
 export default function LandingPage() {
   return (
@@ -273,6 +274,7 @@ export default function LandingPage() {
       }}>
         © 2026 9jaPulse. All rights reserved. Developed to match the highest premium standards.
       </footer>
+      <IosInstallPrompt />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Envelope, Lock, Eye, EyeSlash } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import IosInstallPrompt from "@/components/IosInstallPrompt";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -122,6 +123,7 @@ export default function LoginPage() {
           Create one
         </Link>
       </p>
+      <IosInstallPrompt />
     </div>
   );
 }
