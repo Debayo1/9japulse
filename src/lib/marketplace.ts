@@ -14,6 +14,59 @@ export interface Product {
   updated_at?: string;
 }
 
+const SEED_PRODUCTS: Product[] = [
+  {
+    id: "temu-1",
+    title: "Temu Airpods Max Pro Clone",
+    description: "Premium wireless noise cancelling over-ear headphones with stereo sound.",
+    price: 15000.00,
+    image_url: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500",
+    category: "Electronics",
+    rating: 4.8,
+    stock_quantity: 50
+  },
+  {
+    id: "temu-2",
+    title: "Smart Watch Series 9",
+    description: "Heart rate monitoring, fitness tracking, AMOLED screen and long battery life.",
+    price: 8500.00,
+    image_url: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500",
+    category: "Electronics",
+    rating: 4.5,
+    stock_quantity: 30
+  },
+  {
+    id: "temu-3",
+    title: "Temu Multi-pocket Cargo Pants",
+    description: "Streetwear loose-fit cotton cargo trousers for casual utility fashion.",
+    price: 12000.00,
+    image_url: "https://images.unsplash.com/photo-1542272604-787c3835535d?w=500",
+    category: "Fashion",
+    rating: 4.3,
+    stock_quantity: 100
+  },
+  {
+    id: "temu-4",
+    title: "Minimalist Leather Wallet",
+    description: "Slim bifold carbon fiber design with RFID protection.",
+    price: 4500.00,
+    image_url: "https://images.unsplash.com/photo-1627124765135-56c33fc36baf?w=500",
+    category: "Fashion",
+    rating: 4.6,
+    stock_quantity: 120
+  },
+  {
+    id: "temu-5",
+    title: "Ultralight Portable Bluetooth Speaker",
+    description: "IPX7 waterproof wireless speaker for outdoor hiking and camping.",
+    price: 7500.00,
+    image_url: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=500",
+    category: "Electronics",
+    rating: 4.7,
+    stock_quantity: 45
+  }
+];
+
 /**
  * Verifies a user's transaction PIN.
  */
@@ -42,16 +95,21 @@ export async function verifyUserPin(userId: string, pin: string): Promise<boolea
  * Fetches all products from the local marketplace database.
  */
 export async function getMarketplaceProducts(category?: string): Promise<Product[]> {
-  const supabase = createServiceClient();
-  let query = (supabase as any).from("marketplace_products").select("*").order("created_at", { ascending: false });
-  
-  if (category && category !== "All") {
-    query = query.eq("category", category);
+  try {
+    const supabase = createServiceClient();
+    let query = (supabase as any).from("marketplace_products").select("*").order("created_at", { ascending: false });
+    
+    if (category && category !== "All") {
+      query = query.eq("category", category);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return data && data.length > 0 ? data : SEED_PRODUCTS.filter(p => !category || category === "All" || p.category === category);
+  } catch (err) {
+    console.warn("[9jaPulse] Direct product query failed (offline). Using seed fallbacks:", err);
+    return SEED_PRODUCTS.filter(p => !category || category === "All" || p.category === category);
   }
-  
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data ?? [];
 }
 
 /**
