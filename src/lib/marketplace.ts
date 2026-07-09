@@ -10,6 +10,7 @@ export interface Product {
   category: string;
   rating: number;
   stock_quantity: number;
+  images?: string[];
   created_at?: string;
   updated_at?: string;
 }
@@ -23,7 +24,12 @@ const SEED_PRODUCTS: Product[] = [
     image_url: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500",
     category: "Electronics",
     rating: 4.8,
-    stock_quantity: 50
+    stock_quantity: 50,
+    images: [
+      "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500",
+      "https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=500",
+      "https://images.unsplash.com/photo-1484704849700-f032a568e944?w=500"
+    ]
   },
   {
     id: "temu-2",
@@ -33,7 +39,12 @@ const SEED_PRODUCTS: Product[] = [
     image_url: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500",
     category: "Electronics",
     rating: 4.5,
-    stock_quantity: 30
+    stock_quantity: 30,
+    images: [
+      "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500",
+      "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=500",
+      "https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=500"
+    ]
   },
   {
     id: "temu-3",
@@ -43,7 +54,12 @@ const SEED_PRODUCTS: Product[] = [
     image_url: "https://images.unsplash.com/photo-1542272604-787c3835535d?w=500",
     category: "Fashion",
     rating: 4.3,
-    stock_quantity: 100
+    stock_quantity: 100,
+    images: [
+      "https://images.unsplash.com/photo-1542272604-787c3835535d?w=500",
+      "https://images.unsplash.com/photo-1591195853828-11db59a44f6b?w=500",
+      "https://images.unsplash.com/photo-1582562124811-c09040d0a901?w=500"
+    ]
   },
   {
     id: "temu-4",

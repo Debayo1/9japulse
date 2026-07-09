@@ -32,6 +32,7 @@ interface Product {
   category: string;
   rating: number;
   stock_quantity: number;
+  images?: string[];
 }
 
 interface MarketplaceOrder {
@@ -62,6 +63,7 @@ export default function MarketplacePage() {
 
   // Selected Product details view
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
+  const [activeImgIndex, setActiveImgIndex] = useState(0);
 
   // Tab State
   const [activeTab, setActiveTab] = useState<"catalog" | "orders">("catalog");
@@ -509,7 +511,7 @@ export default function MarketplacePage() {
                 <div
                   key={item.id}
                   className="card product-card"
-                  onClick={() => setViewProduct(item)}
+                  onClick={() => { setViewProduct(item); setActiveImgIndex(0); }}
                   style={{
                     display: "flex",
                     flexDirection: "column",
@@ -736,11 +738,40 @@ export default function MarketplacePage() {
               </button>
             </div>
 
-            <img
-              src={viewProduct.image_url}
-              alt={viewProduct.title}
-              style={{ width: "100%", aspectRatio: "16/10", objectFit: "cover", borderRadius: "16px" }}
-            />
+            {/* Image display */}
+            <div style={{ position: "relative", borderRadius: "16px", overflow: "hidden", aspectRatio: "16/10", width: "100%", backgroundColor: "var(--bg-base)" }}>
+              <img
+                src={viewProduct.images && viewProduct.images.length > 0 ? viewProduct.images[activeImgIndex] : (viewProduct.image_url ?? undefined)}
+                alt={viewProduct.title}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            </div>
+
+            {/* Thumbnail selector row */}
+            {viewProduct.images && viewProduct.images.length > 1 && (
+              <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "2px", scrollbarWidth: "none" }}>
+                {viewProduct.images.map((imgUrl, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setActiveImgIndex(idx)}
+                    style={{
+                      width: "50px",
+                      height: "50px",
+                      borderRadius: "8px",
+                      overflow: "hidden",
+                      border: `2px solid ${activeImgIndex === idx ? "var(--color-primary)" : "var(--border)"}`,
+                      padding: 0,
+                      backgroundColor: "var(--bg-base)",
+                      cursor: "pointer",
+                      transition: "border var(--duration-fast)"
+                    }}
+                  >
+                    <img src={imgUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div>
               <h2 style={{ fontSize: "1.125rem", fontWeight: 855, margin: 0 }}>{viewProduct.title}</h2>

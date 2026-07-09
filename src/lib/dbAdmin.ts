@@ -151,6 +151,7 @@ export async function ensureDbColumnsExist(): Promise<void> {
     `);
 
     // Seed initial marketplace products if empty
+    // Seed initial marketplace products if empty
     await client.query(`
       INSERT INTO public.marketplace_products (id, title, description, price, image_url, category, rating, stock_quantity)
       VALUES
@@ -170,6 +171,36 @@ export async function ensureDbColumnsExist(): Promise<void> {
         ('temu-14', 'Stainless Temperature Control Tumbler', 'Double-wall vacuum insulated smart flask displaying drink temp.', 3900.00, 'https://images.unsplash.com/photo-1577937927133-66ef06acdf18?w=500', 'Home', 4.4, 110),
         ('temu-15', 'Portable Electric Smoothie Blender Cup', 'USB rechargeable mini juice blender with high speed mixing blades.', 8200.00, 'https://images.unsplash.com/photo-1578643463396-0997cb5328c1?w=500', 'Home', 4.5, 65)
       ON CONFLICT (id) DO NOTHING;
+    `);
+
+    // Ensure images array column exists on marketplace_products
+    await client.query(`
+      ALTER TABLE public.marketplace_products 
+      ADD COLUMN IF NOT EXISTS images text[] DEFAULT '{}';
+    `);
+
+    // Seed multiple images for key demo products
+    await client.query(`
+      UPDATE public.marketplace_products 
+      SET images = ARRAY[
+        'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500',
+        'https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=500',
+        'https://images.unsplash.com/photo-1484704849700-f032a568e944?w=500'
+      ] WHERE id = 'temu-1';
+
+      UPDATE public.marketplace_products 
+      SET images = ARRAY[
+        'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500',
+        'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=500',
+        'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=500'
+      ] WHERE id = 'temu-2';
+
+      UPDATE public.marketplace_products 
+      SET images = ARRAY[
+        'https://images.unsplash.com/photo-1542272604-787c3835535d?w=500',
+        'https://images.unsplash.com/photo-1591195853828-11db59a44f6b?w=500',
+        'https://images.unsplash.com/photo-1582562124811-c09040d0a901?w=500'
+      ] WHERE id = 'temu-3';
     `);
 
     isDbVerified = true;
