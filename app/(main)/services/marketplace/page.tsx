@@ -82,7 +82,7 @@ export default function MarketplacePage() {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setProducts(data.products || []);
-      toast.success(`Temu synced ${data.products?.length || 0} products matching "${searchQuery}"`);
+      toast.success(`Synced ${data.products?.length || 0} products matching "${searchQuery}"`);
     } catch (err: any) {
       toast.error(err.message || "Search sync failed");
     } finally {
@@ -147,7 +147,7 @@ export default function MarketplacePage() {
 
   return (
     <div className="page" style={{ paddingBottom: "3rem" }}>
-      <Header title="Temu Super Marketplace" showBack={true} />
+      <Header title="Global Store" showBack={true} />
 
       {/* Hero promo card */}
       <div
@@ -157,7 +157,7 @@ export default function MarketplacePage() {
           alignItems: "center",
           gap: "12px",
           marginBottom: "1.25rem",
-          background: "linear-gradient(135deg, #e74c3c 15%, #f39c12 100%)",
+          background: "linear-gradient(135deg, var(--color-primary) 15%, var(--color-accent) 100%)",
           color: "white",
           border: "none",
           padding: "1.25rem"
@@ -175,9 +175,9 @@ export default function MarketplacePage() {
           <Sparkle size={24} weight="fill" />
         </div>
         <div>
-          <h2 style={{ fontSize: "0.9375rem", fontWeight: 800, margin: 0, letterSpacing: "-0.01em" }}>Direct Temu Imports</h2>
+          <h2 style={{ fontSize: "0.9375rem", fontWeight: 800, margin: 0, letterSpacing: "-0.01em" }}>Direct Global Imports</h2>
           <p style={{ fontSize: "0.75rem", opacity: 0.9, marginTop: "2px" }}>
-            Shop authentic items at factory rates. Standard shipping to Nigeria funded natively via 9jaPulse.
+            Shop premium authentic items at factory rates. Standard shipping to Nigeria funded natively via 9jaPulse.
           </p>
         </div>
       </div>
@@ -190,7 +190,7 @@ export default function MarketplacePage() {
           </span>
           <input
             type="text"
-            placeholder="Search Temu products (e.g., smart watch)..."
+            placeholder="Search global products (e.g., smart watch)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             disabled={searching}
@@ -263,7 +263,7 @@ export default function MarketplacePage() {
       ) : products.length === 0 ? (
         <div className="card" style={{ padding: "2.5rem 1.5rem", textAlign: "center" }}>
           <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem", margin: 0 }}>
-            No products found. Use the search bar above to pull items directly from Temu!
+            No products found. Use the search bar above to pull items directly from global suppliers!
           </p>
         </div>
       ) : (

@@ -28,7 +28,7 @@ const OTHER_SERVICES = [
   { label: "Education",   Icon: Student,      href: "/services/education",    color: "#3B82F6", desc: "WAEC, NECO, JAMB" },
   { label: "Betting",     Icon: Coins,        href: "/services/betting",      color: "#06B6D4", desc: "Fund betting wallets" },
   { label: "Exam PIN",    Icon: Books,        href: "/services/exam",         color: "#F97316", desc: "Pin generators" },
-  { label: "Marketplace", Icon: Storefront,   href: "/services/marketplace",  color: "#E74C3C", desc: "Direct Temu imports" },
+  { label: "Marketplace", Icon: Storefront,   href: "/services/marketplace",  color: "#E74C3C", desc: "Direct global imports" },
 ];
 
 export default function ServicesPage() {

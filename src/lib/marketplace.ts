@@ -17,7 +17,7 @@ export interface Product {
 const SEED_PRODUCTS: Product[] = [
   {
     id: "temu-1",
-    title: "Temu Airpods Max Pro Clone",
+    title: "Airpods Max Pro Series",
     description: "Premium wireless noise cancelling over-ear headphones with stereo sound.",
     price: 15000.00,
     image_url: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500",
@@ -37,7 +37,7 @@ const SEED_PRODUCTS: Product[] = [
   },
   {
     id: "temu-3",
-    title: "Temu Multi-pocket Cargo Pants",
+    title: "Multi-pocket Utility Cargo Pants",
     description: "Streetwear loose-fit cotton cargo trousers for casual utility fashion.",
     price: 12000.00,
     image_url: "https://images.unsplash.com/photo-1542272604-787c3835535d?w=500",
@@ -158,11 +158,11 @@ export async function searchAndSyncTemuProducts(searchQuery: string): Promise<Pr
 
           return {
             id: `temu-${item.product_id || item.id || Math.random().toString(36).substr(2, 9)}`,
-            title: item.product_name || item.title || "Temu Quality Item",
-            description: item.description || `High quality item from Temu. Rating: ${item.rating || '4.5'}.`,
+            title: item.product_name || item.title || "Global Quality Item",
+            description: item.description || `High quality item. Rating: ${item.rating || '4.5'}.`,
             price: ngnPrice,
             image_url: item.product_image || item.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500",
-            category: "Temu Import",
+            category: "Global Import",
             rating: Number(item.rating || 4.5),
             stock_quantity: Math.floor(Math.random() * 50) + 10,
           };
@@ -191,8 +191,8 @@ export async function searchAndSyncTemuProducts(searchQuery: string): Promise<Pr
       },
       {
         id: `mock-t-${Date.now()}-2`,
-        title: `Temu Choice ${searchQuery}`,
-        description: `Original Temu Choice edition of ${searchQuery}. High durability, sleek aesthetics, and cheap shipping rates to Nigeria.`,
+        title: `Premium Choice ${searchQuery}`,
+        description: `Original premium choice edition of ${searchQuery}. High durability, sleek aesthetics, and cheap shipping rates to Nigeria.`,
         price: Math.round((Math.random() * 18000) + 4000),
         image_url: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500",
         category: selectedCategory,
