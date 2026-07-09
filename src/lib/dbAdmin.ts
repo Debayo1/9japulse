@@ -114,6 +114,34 @@ export async function ensureDbColumnsExist(): Promise<void> {
       );
     `);
 
+    // 6. Ensure marketplace_products table exists
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public.marketplace_products (
+        id text PRIMARY KEY,
+        title text NOT NULL,
+        description text,
+        price numeric(12,2) NOT NULL,
+        image_url text,
+        category text NOT NULL DEFAULT 'General',
+        rating numeric(3,2) DEFAULT 4.5,
+        stock_quantity integer NOT NULL DEFAULT 100,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+
+    // Seed initial marketplace products if empty
+    await client.query(`
+      INSERT INTO public.marketplace_products (id, title, description, price, image_url, category, rating, stock_quantity)
+      VALUES
+        ('temu-1', 'Temu Airpods Max Pro Clone', 'Premium wireless noise cancelling over-ear headphones with stereo sound.', 15000.00, 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500', 'Electronics', 4.8, 50),
+        ('temu-2', 'Smart Watch Series 9', 'Heart rate monitoring, fitness tracking, AMOLED screen and long battery life.', 8500.00, 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500', 'Electronics', 4.5, 30),
+        ('temu-3', 'Temu Multi-pocket Cargo Pants', 'Streetwear loose-fit cotton cargo trousers for casual utility fashion.', 12000.00, 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=500', 'Fashion', 4.3, 100),
+        ('temu-4', 'Minimalist Leather Wallet', 'Slim bifold carbon fiber design with RFID protection.', 4500.00, 'https://images.unsplash.com/photo-1627124765135-56c33fc36baf?w=500', 'Fashion', 4.6, 120),
+        ('temu-5', 'Ultralight Portable Bluetooth Speaker', 'IPX7 waterproof wireless speaker for outdoor hiking and camping.', 7500.00, 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=500', 'Electronics', 4.7, 45)
+      ON CONFLICT (id) DO NOTHING;
+    `);
+
     isDbVerified = true;
     console.log("[9jaPulse] Database self-healing schema checks verified successfully.");
   } catch (err: unknown) {
