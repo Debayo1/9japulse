@@ -11,7 +11,13 @@ import {
   X, 
   Sparkle, 
   CheckCircle,
-  Backspace
+  Backspace,
+  Truck,
+  FileText,
+  MapPin,
+  User,
+  Phone,
+  Envelope
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import Header from "@/components/Header";
@@ -28,6 +34,22 @@ interface Product {
   stock_quantity: number;
 }
 
+interface MarketplaceOrder {
+  id: string;
+  user_id: string;
+  product_id: string;
+  product_title: string;
+  product_image: string | null;
+  amount: number;
+  reference: string;
+  shipping_name: string;
+  shipping_phone: string;
+  shipping_email: string;
+  shipping_address: string;
+  status: string;
+  created_at: string;
+}
+
 const CATEGORIES = ["All", "Electronics", "Fashion", "Gadgets", "Home"];
 
 export default function MarketplacePage() {
@@ -41,20 +63,46 @@ export default function MarketplacePage() {
   // Selected Product details view
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
 
+  // Tab State
+  const [activeTab, setActiveTab] = useState<"catalog" | "orders">("catalog");
+
+  // Shipping details state
+  const [openShippingModal, setOpenShippingModal] = useState(false);
+  const [shippingDetails, setShippingDetails] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    address: ""
+  });
+
   // Checkout PIN entry states
   const [checkoutProduct, setCheckoutProduct] = useState<Product | null>(null);
   const [pin, setPin] = useState("");
   const [submittingPurchase, setSubmittingPurchase] = useState(false);
+
+  // Orders list state
+  const [orders, setOrders] = useState<MarketplaceOrder[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<MarketplaceOrder | null>(null);
 
   useEffect(() => {
     async function checkAuth() {
       const { data } = await supabaseBrowser.auth.getSession();
       if (!data.session) {
         router.replace("/login");
+        return;
       }
+      
+      const user = data.session.user;
+      setShippingDetails(prev => ({
+        ...prev,
+        name: user.user_metadata?.full_name || "",
+        email: user.email || ""
+      }));
     }
     checkAuth();
     loadCatalog();
+    loadOrders();
   }, [router]);
 
   async function loadCatalog(category?: string) {
@@ -69,6 +117,50 @@ export default function MarketplacePage() {
       toast.error(err.message || "Failed to load products");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadOrders() {
+    setLoadingOrders(true);
+    try {
+      const res = await fetch("/api/marketplace?type=orders");
+      const data = await res.json();
+      
+      const cached = getCachedOrders();
+      const combined = [...(data.orders || [])];
+      
+      for (const item of cached) {
+        if (!combined.some(o => o.reference === item.reference)) {
+          combined.push(item);
+        }
+      }
+      
+      combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setOrders(combined);
+    } catch (err) {
+      console.warn("Failed to fetch live orders, loading from cache:", err);
+      setOrders(getCachedOrders());
+    } finally {
+      setLoadingOrders(false);
+    }
+  }
+
+  function getCachedOrders(): MarketplaceOrder[] {
+    try {
+      const raw = localStorage.getItem("vtu_marketplace_orders");
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveOrderToCache(order: MarketplaceOrder) {
+    try {
+      const list = getCachedOrders();
+      list.unshift(order);
+      localStorage.setItem("vtu_marketplace_orders", JSON.stringify(list));
+    } catch (e) {
+      console.error("Local storage write failed", e);
     }
   }
 
@@ -108,6 +200,7 @@ export default function MarketplacePage() {
   const triggerCheckout = (product: Product) => {
     setViewProduct(null);
     setCheckoutProduct(product);
+    setOpenShippingModal(true); // show shipping collector first!
     setPin("");
   };
 
@@ -121,15 +214,23 @@ export default function MarketplacePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           productId: checkoutProduct.id,
-          pin: pin
+          pin: pin,
+          shippingDetails: shippingDetails
         })
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
 
       toast.success(data.message || "Purchase successful!");
+      
+      if (data.order) {
+        saveOrderToCache(data.order);
+      }
+
       setCheckoutProduct(null);
+      setOpenShippingModal(false);
       loadCatalog(selectedCategory);
+      loadOrders();
     } catch (err: any) {
       toast.error(err.message || "Purchase failed");
       setPin(""); // clear PIN on failure
@@ -140,10 +241,97 @@ export default function MarketplacePage() {
 
   // Watch PIN length to auto-trigger purchase
   useEffect(() => {
-    if (pin.length === 4 && checkoutProduct) {
+    if (pin.length === 4 && checkoutProduct && !openShippingModal) {
       handlePurchase();
     }
-  }, [pin, checkoutProduct]);
+  }, [pin, checkoutProduct, openShippingModal]);
+
+  function OrderTimeline({ status, date }: { status: string; date: string }) {
+    const steps = [
+      { label: "Order Placed", key: "placed", desc: `We received your order request on ${new Date(date).toLocaleDateString()}.` },
+      { label: "Processing", key: "processing", desc: "Warehouse packaging your items." },
+      { label: "In Transit", key: "in_transit", desc: "Dispatched with Pulse Express Courier." },
+      { label: "Delivered", key: "delivered", desc: "Parcel successfully delivered to your address." }
+    ];
+
+    const getStepState = (stepKey: string) => {
+      if (status === "delivered") return "completed";
+      if (status === "in_transit") {
+        if (stepKey === "placed" || stepKey === "processing") return "completed";
+        if (stepKey === "in_transit") return "active";
+        return "pending";
+      }
+      if (stepKey === "placed") return "completed";
+      if (stepKey === "processing") return "active";
+      return "pending";
+    };
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", padding: "0.5rem 0" }}>
+        {steps.map((step, idx) => {
+          const state = getStepState(step.key);
+          return (
+            <div key={step.key} style={{ display: "flex", gap: "14px", position: "relative" }}>
+              {/* Connecting Line */}
+              {idx < steps.length - 1 && (
+                <div style={{
+                  position: "absolute",
+                  left: "10px",
+                  top: "22px",
+                  bottom: "-22px",
+                  width: "2px",
+                  backgroundColor: state === "completed" ? "var(--color-primary)" : "var(--border)",
+                  zIndex: 1
+                }} />
+              )}
+
+              {/* Indicator Dot */}
+              <div style={{
+                width: "22px",
+                height: "22px",
+                borderRadius: "99px",
+                backgroundColor: state === "completed" 
+                  ? "var(--color-primary)" 
+                  : state === "active" 
+                    ? "var(--color-primary)" 
+                    : "var(--bg-elevated)",
+                border: `2px solid ${state === "completed" || state === "active" ? "var(--color-primary)" : "var(--border)"}`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 2,
+                color: "white",
+                fontSize: "0.625rem",
+                fontWeight: "bold"
+              }}>
+                {state === "completed" ? "✓" : ""}
+              </div>
+
+              {/* Step content */}
+              <div style={{ flex: 1 }}>
+                <h4 style={{ 
+                  fontSize: "0.8125rem", 
+                  fontWeight: state === "active" || state === "completed" ? 800 : 600, 
+                  margin: 0,
+                  color: state === "pending" ? "var(--text-muted)" : "var(--text-primary)"
+                }}>
+                  {step.label}
+                </h4>
+                <p style={{ 
+                  fontSize: "0.7125rem", 
+                  color: "var(--text-secondary)", 
+                  margin: "2px 0 0 0",
+                  lineHeight: 1.3
+                }}>
+                  {step.desc}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div className="page" style={{ paddingBottom: "3rem" }}>
@@ -182,178 +370,328 @@ export default function MarketplacePage() {
         </div>
       </div>
 
-      {/* Search form */}
-      <form onSubmit={handleSearch} style={{ display: "flex", gap: "8px", marginBottom: "1.25rem" }}>
-        <div style={{ position: "relative", flex: 1 }}>
-          <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }}>
-            <MagnifyingGlass size={18} />
-          </span>
-          <input
-            type="text"
-            placeholder="Search global products (e.g., smart watch)..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            disabled={searching}
-            style={{
-              width: "100%",
-              height: "44px",
-              paddingLeft: "38px",
-              paddingRight: "12px",
-              borderRadius: "12px",
-              backgroundColor: "var(--bg-elevated)",
-              border: "1px solid var(--border)",
-              color: "var(--text-primary)",
-              fontSize: "0.875rem",
-              outline: "none"
-            }}
-          />
-        </div>
+      {/* Tab Switcher: Browse vs My Orders */}
+      <div style={{
+        display: "flex",
+        borderRadius: "12px",
+        backgroundColor: "var(--bg-elevated)",
+        padding: "4px",
+        marginBottom: "1.25rem"
+      }}>
         <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={searching || !searchQuery.trim()}
-          style={{ height: "44px", padding: "0 1.25rem", whiteSpace: "nowrap", fontSize: "0.8125rem" }}
+          onClick={() => setActiveTab("catalog")}
+          style={{
+            flex: 1,
+            padding: "8px",
+            borderRadius: "8px",
+            border: "none",
+            backgroundColor: activeTab === "catalog" ? "var(--bg-surface)" : "transparent",
+            color: activeTab === "catalog" ? "var(--color-primary)" : "var(--text-secondary)",
+            fontWeight: 800,
+            fontSize: "0.8125rem",
+            cursor: "pointer",
+            boxShadow: activeTab === "catalog" ? "0 2px 8px rgba(0,0,0,0.06)" : "none",
+            transition: "all var(--duration-fast)"
+          }}
         >
-          {searching ? "Syncing..." : "Search"}
+          Browse Catalog
         </button>
-      </form>
-
-      {/* Horizontal Category list */}
-      <div 
-        style={{ 
-          display: "flex", 
-          gap: "8px", 
-          overflowX: "auto", 
-          marginBottom: "1.5rem", 
-          paddingBottom: "4px",
-          scrollbarWidth: "none"
-        }}
-      >
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => handleCategoryChange(cat)}
-            style={{
-              flexShrink: 0,
-              padding: "6px 14px",
-              borderRadius: "99px",
-              backgroundColor: selectedCategory === cat ? "var(--color-primary)" : "var(--bg-elevated)",
-              border: `1px solid ${selectedCategory === cat ? "var(--color-primary)" : "var(--border)"}`,
-              color: selectedCategory === cat ? "white" : "var(--text-secondary)",
-              fontSize: "0.75rem",
-              fontWeight: 700,
-              cursor: "pointer",
-              transition: "all var(--duration-fast)"
-            }}
-          >
-            {cat}
-          </button>
-        ))}
+        <button
+          onClick={() => setActiveTab("orders")}
+          style={{
+            flex: 1,
+            padding: "8px",
+            borderRadius: "8px",
+            border: "none",
+            backgroundColor: activeTab === "orders" ? "var(--bg-surface)" : "transparent",
+            color: activeTab === "orders" ? "var(--color-primary)" : "var(--text-secondary)",
+            fontWeight: 800,
+            fontSize: "0.8125rem",
+            cursor: "pointer",
+            boxShadow: activeTab === "orders" ? "0 2px 8px rgba(0,0,0,0.06)" : "none",
+            transition: "all var(--duration-fast)"
+          }}
+        >
+          My Orders
+        </button>
       </div>
 
-      {/* Catalog view */}
-      {loading ? (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.875rem" }}>
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="card" style={{ height: "200px", opacity: 0.5, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div className="spinner" />
-            </div>
-          ))}
-        </div>
-      ) : products.length === 0 ? (
-        <div className="card" style={{ padding: "2.5rem 1.5rem", textAlign: "center" }}>
-          <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem", margin: 0 }}>
-            No products found. Use the search bar above to pull items directly from global suppliers!
-          </p>
-        </div>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.875rem" }}>
-          {products.map((item) => (
-            <div
-              key={item.id}
-              className="card product-card"
-              onClick={() => setViewProduct(item)}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                padding: "8px",
-                cursor: "pointer",
-                position: "relative",
-                height: "100%",
-                justifyContent: "between"
-              }}
-            >
-              {/* Product Image */}
-              <div style={{ position: "relative", borderRadius: "10px", overflow: "hidden", aspectRatio: "1/1", width: "100%", backgroundColor: "var(--bg-base)" }}>
-                <img
-                  src={item.image_url}
-                  alt={item.title}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-                <span style={{
-                  position: "absolute",
-                  bottom: "6px",
-                  left: "6px",
-                  fontSize: "0.625rem",
-                  fontWeight: 800,
-                  backgroundColor: "rgba(15,23,42,0.85)",
-                  color: "white",
-                  padding: "3px 6px",
-                  borderRadius: "4px"
-                }}>
-                  {item.category}
-                </span>
-              </div>
-
-              {/* Title & Rating */}
-              <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "4px", flexGrow: 1 }}>
-                <h3 style={{
-                  fontSize: "0.75rem",
-                  fontWeight: 800,
-                  margin: 0,
+      {/* CATALOG TAB CONTENT */}
+      {activeTab === "catalog" && (
+        <>
+          {/* Search form */}
+          <form onSubmit={handleSearch} style={{ display: "flex", gap: "8px", marginBottom: "1.25rem" }}>
+            <div style={{ position: "relative", flex: 1 }}>
+              <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }}>
+                <MagnifyingGlass size={18} />
+              </span>
+              <input
+                type="text"
+                placeholder="Search global products (e.g., smart watch)..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                disabled={searching}
+                style={{
+                  width: "100%",
+                  height: "44px",
+                  paddingLeft: "38px",
+                  paddingRight: "12px",
+                  borderRadius: "12px",
+                  backgroundColor: "var(--bg-elevated)",
+                  border: "1px solid var(--border)",
                   color: "var(--text-primary)",
-                  display: "-webkit-box",
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
-                  lineHeight: "1.3"
-                }}>
-                  {item.title}
-                </h3>
-                <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
-                  <Star size={10} weight="fill" color="#F59E0B" />
-                  <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "var(--text-secondary)" }}>{item.rating}</span>
-                </div>
-              </div>
+                  fontSize: "0.875rem",
+                  outline: "none"
+                }}
+              />
+            </div>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={searching || !searchQuery.trim()}
+              style={{ height: "44px", padding: "0 1.25rem", whiteSpace: "nowrap", fontSize: "0.8125rem" }}
+            >
+              {searching ? "Syncing..." : "Search"}
+            </button>
+          </form>
 
-              {/* Price & Buy footer */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px" }}>
-                <strong style={{ fontSize: "0.875rem", color: "var(--color-primary)" }}>
-                  ₦{item.price.toLocaleString()}
-                </strong>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    triggerCheckout(item);
-                  }}
+          {/* Horizontal Category list */}
+          <div 
+            style={{ 
+              display: "flex", 
+              gap: "8px", 
+              overflowX: "auto", 
+              marginBottom: "1.5rem", 
+              paddingBottom: "4px",
+              scrollbarWidth: "none"
+            }}
+          >
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => handleCategoryChange(cat)}
+                style={{
+                  flexShrink: 0,
+                  padding: "6px 14px",
+                  borderRadius: "99px",
+                  backgroundColor: selectedCategory === cat ? "var(--color-primary)" : "var(--bg-elevated)",
+                  border: `1px solid ${selectedCategory === cat ? "var(--color-primary)" : "var(--border)"}`,
+                  color: selectedCategory === cat ? "white" : "var(--text-secondary)",
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "all var(--duration-fast)"
+                }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Catalog view */}
+          {loading ? (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.875rem" }}>
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="card" style={{ height: "200px", opacity: 0.5, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div className="spinner" />
+                </div>
+              ))}
+            </div>
+          ) : products.length === 0 ? (
+            <div className="card" style={{ padding: "2.5rem 1.5rem", textAlign: "center" }}>
+              <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem", margin: 0 }}>
+                No products found. Use the search bar above to pull items directly from global suppliers!
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.875rem" }}>
+              {products.map((item) => (
+                <div
+                  key={item.id}
+                  className="card product-card"
+                  onClick={() => setViewProduct(item)}
                   style={{
-                    backgroundColor: "color-mix(in srgb, var(--color-primary) 10%, transparent)",
-                    border: "none",
-                    borderRadius: "8px",
-                    width: "28px",
-                    height: "28px",
                     display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "var(--color-primary)",
-                    cursor: "pointer"
+                    flexDirection: "column",
+                    padding: "8px",
+                    cursor: "pointer",
+                    position: "relative",
+                    height: "100%",
+                    justifyContent: "between"
                   }}
                 >
-                  <ShoppingCart size={14} weight="fill" />
-                </button>
-              </div>
+                  {/* Product Image */}
+                  <div style={{ position: "relative", borderRadius: "10px", overflow: "hidden", aspectRatio: "1/1", width: "100%", backgroundColor: "var(--bg-base)" }}>
+                    <img
+                      src={item.image_url}
+                      alt={item.title}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                    <span style={{
+                      position: "absolute",
+                      bottom: "6px",
+                      left: "6px",
+                      fontSize: "0.625rem",
+                      fontWeight: 800,
+                      backgroundColor: "rgba(15,23,42,0.85)",
+                      color: "white",
+                      padding: "3px 6px",
+                      borderRadius: "4px"
+                    }}>
+                      {item.category}
+                    </span>
+                  </div>
+
+                  {/* Title & Rating */}
+                  <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "4px", flexGrow: 1 }}>
+                    <h3 style={{
+                      fontSize: "0.75rem",
+                      fontWeight: 800,
+                      margin: 0,
+                      color: "var(--text-primary)",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                      lineHeight: "1.3"
+                    }}>
+                      {item.title}
+                    </h3>
+                    <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
+                      <Star size={10} weight="fill" color="#F59E0B" />
+                      <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "var(--text-secondary)" }}>{item.rating}</span>
+                    </div>
+                  </div>
+
+                  {/* Price & Buy footer */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px", borderTop: "1px solid var(--border)", paddingTop: "6px" }}>
+                    <strong style={{ fontSize: "0.875rem", color: "var(--color-primary)" }}>
+                      ₦{item.price.toLocaleString()}
+                    </strong>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        triggerCheckout(item);
+                      }}
+                      style={{
+                        backgroundColor: "color-mix(in srgb, var(--color-primary) 10%, transparent)",
+                        border: "none",
+                        borderRadius: "8px",
+                        width: "28px",
+                        height: "28px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "var(--color-primary)",
+                        cursor: "pointer"
+                      }}
+                    >
+                      <ShoppingCart size={14} weight="fill" />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+        </>
+      )}
+
+      {/* ORDERS TAB CONTENT */}
+      {activeTab === "orders" && (
+        <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {loadingOrders ? (
+            <div style={{ padding: "3rem 1.5rem", textAlign: "center" }}>
+              <div className="spinner" style={{ margin: "0 auto" }} />
+              <p style={{ marginTop: "12px", color: "var(--text-secondary)", fontSize: "0.8125rem" }}>Loading orders...</p>
+            </div>
+          ) : orders.length === 0 ? (
+            <div className="card" style={{ padding: "3rem 1.5rem", textAlign: "center" }}>
+              <div style={{ color: "var(--text-muted)", marginBottom: "12px" }}>
+                <Truck size={48} weight="thin" />
+              </div>
+              <h3 style={{ fontSize: "0.9375rem", fontWeight: 800, margin: 0 }}>No orders found</h3>
+              <p style={{ color: "var(--text-secondary)", fontSize: "0.75rem", marginTop: "4px" }}>
+                You have not placed any orders yet. Browse our catalog to shop global items!
+              </p>
+              <button 
+                onClick={() => setActiveTab("catalog")}
+                className="btn btn-primary"
+                style={{ marginTop: "1rem", height: "36px", padding: "0 1.25rem", fontSize: "0.75rem" }}
+              >
+                Go to Shop
+              </button>
+            </div>
+          ) : (
+            orders.map((order) => (
+              <div
+                key={order.id}
+                className="card"
+                onClick={() => setSelectedOrder(order)}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  padding: "1rem",
+                  cursor: "pointer",
+                  border: "1px solid var(--border)",
+                  borderRadius: "16px",
+                  transition: "all var(--duration-fast)"
+                }}
+              >
+                {/* Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border)", paddingBottom: "8px", marginBottom: "10px" }}>
+                  <div>
+                    <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "var(--text-muted)" }}>REFERENCE</span>
+                    <p style={{ fontSize: "0.75rem", fontWeight: 800, margin: 0, color: "var(--color-primary)" }}>{order.reference}</p>
+                  </div>
+                  <span style={{
+                    fontSize: "0.625rem",
+                    fontWeight: 800,
+                    textTransform: "uppercase",
+                    backgroundColor: order.status === "delivered" 
+                      ? "rgba(16,185,129,0.1)" 
+                      : order.status === "in_transit" 
+                        ? "rgba(59,130,246,0.1)" 
+                        : "rgba(245,158,11,0.1)",
+                    color: order.status === "delivered" 
+                      ? "#10B981" 
+                      : order.status === "in_transit" 
+                        ? "#3B82F6" 
+                        : "#F59E0B",
+                    padding: "4px 8px",
+                    borderRadius: "6px"
+                  }}>
+                    {order.status.replace("_", " ")}
+                  </span>
+                </div>
+
+                {/* Details body */}
+                <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                  {order.product_image ? (
+                    <img
+                      src={order.product_image}
+                      alt={order.product_title}
+                      style={{ width: "50px", height: "50px", objectFit: "cover", borderRadius: "8px", backgroundColor: "var(--bg-base)" }}
+                    />
+                  ) : (
+                    <div style={{ width: "50px", height: "50px", borderRadius: "8px", backgroundColor: "var(--bg-base)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <ShoppingCart size={20} />
+                    </div>
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ fontSize: "0.8125rem", fontWeight: 800, margin: 0, color: "var(--text-primary)", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                      {order.product_title}
+                    </h4>
+                    <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)" }}>
+                      ₦{Number(order.amount).toLocaleString()}
+                    </span>
+                    <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)", marginLeft: "8px" }}>
+                      • {new Date(order.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
 
@@ -405,7 +743,7 @@ export default function MarketplacePage() {
             />
 
             <div>
-              <h2 style={{ fontSize: "1.125rem", fontWeight: 850, margin: 0 }}>{viewProduct.title}</h2>
+              <h2 style={{ fontSize: "1.125rem", fontWeight: 855, margin: 0 }}>{viewProduct.title}</h2>
               <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "4px" }}>
                 <Star size={14} weight="fill" color="#F59E0B" />
                 <span style={{ fontSize: "0.75rem", fontWeight: 700 }}>{viewProduct.rating} Rating</span>
@@ -439,8 +777,182 @@ export default function MarketplacePage() {
         </div>
       )}
 
+      {/* ─── Shipping Details Modal ─── */}
+      {openShippingModal && checkoutProduct && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 100,
+          backgroundColor: "rgba(0,0,0,0.6)",
+          backdropFilter: "blur(8px)",
+          display: "flex",
+          alignItems: "end",
+          justifyContent: "center",
+          animation: "fade-in 0.25s"
+        }}>
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!shippingDetails.name || !shippingDetails.phone || !shippingDetails.email || !shippingDetails.address) {
+                toast.error("Please fill in all shipping details!");
+                return;
+              }
+              setOpenShippingModal(false); // triggers PIN keypad next
+            }}
+            style={{
+              backgroundColor: "var(--bg-elevated)",
+              borderTopLeftRadius: "24px",
+              borderTopRightRadius: "24px",
+              border: "1px solid var(--border)",
+              borderBottom: "none",
+              width: "100%",
+              maxWidth: "460px",
+              padding: "1.5rem",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: "1.125rem",
+              animation: "slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1)"
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <span style={{ fontSize: "0.6875rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-primary)", fontWeight: 800 }}>
+                  Delivery Details
+                </span>
+                <h3 style={{ fontSize: "0.9375rem", fontWeight: 950, margin: "2px 0 0 0" }}>Shipping Information</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenShippingModal(false);
+                  setCheckoutProduct(null);
+                }}
+                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Product recap banner */}
+            <div style={{ display: "flex", gap: "10px", alignItems: "center", padding: "8px", backgroundColor: "var(--bg-base)", borderRadius: "10px" }}>
+              <img
+                src={checkoutProduct.image_url}
+                alt={checkoutProduct.title}
+                style={{ width: "40px", height: "40px", objectFit: "cover", borderRadius: "6px" }}
+              />
+              <div>
+                <h4 style={{ fontSize: "0.75rem", fontWeight: 800, margin: 0 }}>{checkoutProduct.title}</h4>
+                <p style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--color-primary)", margin: 0 }}>₦{checkoutProduct.price.toLocaleString()}</p>
+              </div>
+            </div>
+
+            {/* Inputs */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {/* Full Name */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ fontSize: "0.6875rem", fontWeight: 700, color: "var(--text-secondary)" }}>Recipient Full Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. John Obi"
+                  value={shippingDetails.name}
+                  onChange={(e) => setShippingDetails(prev => ({ ...prev, name: e.target.value }))}
+                  style={{
+                    height: "42px",
+                    borderRadius: "10px",
+                    backgroundColor: "var(--bg-base)",
+                    border: "1px solid var(--border)",
+                    color: "var(--text-primary)",
+                    padding: "0 12px",
+                    fontSize: "0.8125rem",
+                    outline: "none"
+                  }}
+                />
+              </div>
+
+              {/* Phone Number */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ fontSize: "0.6875rem", fontWeight: 700, color: "var(--text-secondary)" }}>Phone Number</label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. 08012345678"
+                  value={shippingDetails.phone}
+                  onChange={(e) => setShippingDetails(prev => ({ ...prev, phone: e.target.value }))}
+                  style={{
+                    height: "42px",
+                    borderRadius: "10px",
+                    backgroundColor: "var(--bg-base)",
+                    border: "1px solid var(--border)",
+                    color: "var(--text-primary)",
+                    padding: "0 12px",
+                    fontSize: "0.8125rem",
+                    outline: "none"
+                  }}
+                />
+              </div>
+
+              {/* Email Address */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ fontSize: "0.6875rem", fontWeight: 700, color: "var(--text-secondary)" }}>Email Address</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="e.g. john@example.com"
+                  value={shippingDetails.email}
+                  onChange={(e) => setShippingDetails(prev => ({ ...prev, email: e.target.value }))}
+                  style={{
+                    height: "42px",
+                    borderRadius: "10px",
+                    backgroundColor: "var(--bg-base)",
+                    border: "1px solid var(--border)",
+                    color: "var(--text-primary)",
+                    padding: "0 12px",
+                    fontSize: "0.8125rem",
+                    outline: "none"
+                  }}
+                />
+              </div>
+
+              {/* Delivery Address */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ fontSize: "0.6875rem", fontWeight: 700, color: "var(--text-secondary)" }}>Delivery Address</label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="Street Address, City, State"
+                  value={shippingDetails.address}
+                  onChange={(e) => setShippingDetails(prev => ({ ...prev, address: e.target.value }))}
+                  style={{
+                    borderRadius: "10px",
+                    backgroundColor: "var(--bg-base)",
+                    border: "1px solid var(--border)",
+                    color: "var(--text-primary)",
+                    padding: "10px 12px",
+                    fontSize: "0.8125rem",
+                    outline: "none",
+                    resize: "none",
+                    fontFamily: "inherit"
+                  }}
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary"
+              style={{ height: "44px", width: "100%", fontWeight: 800, marginTop: "0.5rem" }}
+            >
+              Verify & Pay ₦{checkoutProduct.price.toLocaleString()}
+            </button>
+          </form>
+        </div>
+      )}
+
       {/* ─── PIN Checkout Modal ─── */}
-      {checkoutProduct && (
+      {checkoutProduct && !openShippingModal && (
         <div style={{
           position: "fixed",
           inset: 0,
@@ -582,6 +1094,115 @@ export default function MarketplacePage() {
                 Authorizing wallet transaction ledger...
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Order Detail & Tracker Modal ─── */}
+      {selectedOrder && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 100,
+          backgroundColor: "rgba(0,0,0,0.6)",
+          backdropFilter: "blur(8px)",
+          display: "flex",
+          alignItems: "end",
+          justifyContent: "center",
+          animation: "fade-in 0.25s"
+        }}>
+          <div style={{
+            backgroundColor: "var(--bg-elevated)",
+            borderTopLeftRadius: "24px",
+            borderTopRightRadius: "24px",
+            border: "1px solid var(--border)",
+            borderBottom: "none",
+            width: "100%",
+            maxWidth: "460px",
+            padding: "1.5rem",
+            maxHeight: "85vh",
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: "1.25rem",
+            animation: "slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+              <div>
+                <span style={{ fontSize: "0.6875rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-primary)", fontWeight: 800 }}>
+                  Order Tracker
+                </span>
+                <h3 style={{ fontSize: "0.9375rem", fontWeight: 950, margin: "2px 0 0 0" }}>Ref: {selectedOrder.reference}</h3>
+              </div>
+              <button
+                onClick={() => setSelectedOrder(null)}
+                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Product card block */}
+            <div style={{ display: "flex", gap: "12px", alignItems: "center", padding: "10px", backgroundColor: "var(--bg-base)", borderRadius: "12px" }}>
+              {selectedOrder.product_image ? (
+                <img
+                  src={selectedOrder.product_image}
+                  alt={selectedOrder.product_title}
+                  style={{ width: "48px", height: "48px", objectFit: "cover", borderRadius: "8px" }}
+                />
+              ) : (
+                <div style={{ width: "48px", height: "48px", borderRadius: "8px", backgroundColor: "var(--border)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <ShoppingCart size={20} />
+                </div>
+              )}
+              <div>
+                <h4 style={{ fontSize: "0.8125rem", fontWeight: 800, margin: 0 }}>{selectedOrder.product_title}</h4>
+                <p style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--color-primary)", margin: "2px 0 0 0" }}>
+                  ₦{Number(selectedOrder.amount).toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            {/* Visual Tracker Timeline */}
+            <div style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--border)", borderTop: "1px solid var(--border)" }}>
+              <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase" }}>Visual Status Timeline</span>
+              <div style={{ marginTop: "10px" }}>
+                <OrderTimeline status={selectedOrder.status} date={selectedOrder.created_at} />
+              </div>
+            </div>
+
+            {/* Shipping details */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase" }}>Delivery Information</span>
+              
+              <div style={{ display: "flex", gap: "8px", alignItems: "start", fontSize: "0.75rem" }}>
+                <User size={14} style={{ marginTop: "2px", color: "var(--text-secondary)" }} />
+                <div>
+                  <strong style={{ color: "var(--text-primary)" }}>{selectedOrder.shipping_name}</strong>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "8px", alignItems: "start", fontSize: "0.75rem" }}>
+                <Phone size={14} style={{ marginTop: "2px", color: "var(--text-secondary)" }} />
+                <div>
+                  <span style={{ color: "var(--text-secondary)" }}>{selectedOrder.shipping_phone}</span>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "8px", alignItems: "start", fontSize: "0.75rem" }}>
+                <Envelope size={14} style={{ marginTop: "2px", color: "var(--text-secondary)" }} />
+                <div>
+                  <span style={{ color: "var(--text-secondary)" }}>{selectedOrder.shipping_email}</span>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "8px", alignItems: "start", fontSize: "0.75rem" }}>
+                <MapPin size={14} style={{ marginTop: "2px", color: "var(--text-secondary)" }} />
+                <div>
+                  <span style={{ color: "var(--text-secondary)", lineHeight: 1.3 }}>{selectedOrder.shipping_address}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

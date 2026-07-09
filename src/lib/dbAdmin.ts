@@ -130,6 +130,26 @@ export async function ensureDbColumnsExist(): Promise<void> {
       );
     `);
 
+    // 7. Ensure marketplace_orders table exists
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public.marketplace_orders (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+        product_id text NOT NULL,
+        product_title text NOT NULL,
+        product_image text,
+        amount numeric(12,2) NOT NULL,
+        reference text NOT NULL UNIQUE,
+        shipping_name text NOT NULL,
+        shipping_phone text NOT NULL,
+        shipping_email text NOT NULL,
+        shipping_address text NOT NULL,
+        status text NOT NULL DEFAULT 'processing',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+
     // Seed initial marketplace products if empty
     await client.query(`
       INSERT INTO public.marketplace_products (id, title, description, price, image_url, category, rating, stock_quantity)

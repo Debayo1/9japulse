@@ -330,14 +330,38 @@ export async function searchAndSyncTemuProducts(searchQuery: string): Promise<Pr
   return getMarketplaceProducts();
 }
 
+export interface ShippingDetails {
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+}
+
+export interface MarketplaceOrder {
+  id: string;
+  user_id: string;
+  product_id: string;
+  product_title: string;
+  product_image: string | null;
+  amount: number;
+  reference: string;
+  shipping_name: string;
+  shipping_phone: string;
+  shipping_email: string;
+  shipping_address: string;
+  status: string;
+  created_at: string;
+}
+
 /**
  * Purchases a product from the marketplace using the user's withdrawable balance.
  */
 export async function purchaseMarketplaceItem(
   userId: string,
   productId: string,
-  transactionPin: string
-): Promise<{ success: boolean; message: string; balance: number }> {
+  transactionPin: string,
+  shippingDetails: ShippingDetails
+): Promise<{ success: boolean; message: string; balance: number; order?: MarketplaceOrder }> {
   const supabase = createServiceClient();
 
   // 1. Verify transaction PIN
@@ -364,7 +388,7 @@ export async function purchaseMarketplaceItem(
     if (!product && productId.startsWith("mock-")) {
       product = {
         id: productId,
-        title: "Mock Temu Choice Product",
+        title: "Mock Choice Product",
         description: "Dynamic offline checkout fallback item.",
         price: 5000,
         image_url: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500",
@@ -406,6 +430,42 @@ export async function purchaseMarketplaceItem(
     }
   });
 
+  const nowStr = new Date().toISOString();
+  const createdOrder: MarketplaceOrder = {
+    id: reference,
+    user_id: userId,
+    product_id: productId,
+    product_title: product.title,
+    product_image: product.image_url,
+    amount: price,
+    reference,
+    shipping_name: shippingDetails.name,
+    shipping_phone: shippingDetails.phone,
+    shipping_email: shippingDetails.email,
+    shipping_address: shippingDetails.address,
+    status: "processing",
+    created_at: nowStr
+  };
+
+  // 4.5. Create order record in database (with silent catch if DB is offline/table missing)
+  try {
+    await (supabase as any).from("marketplace_orders").insert({
+      user_id: userId,
+      product_id: productId,
+      product_title: product.title,
+      product_image: product.image_url,
+      amount: price,
+      reference,
+      shipping_name: shippingDetails.name,
+      shipping_phone: shippingDetails.phone,
+      shipping_email: shippingDetails.email,
+      shipping_address: shippingDetails.address,
+      status: "processing"
+    });
+  } catch (e) {
+    console.warn("[9jaPulse] Failed to write live marketplace order to DB:", e);
+  }
+
   // 5. Decrement the stock quantity
   try {
     await (supabase as any)
@@ -419,6 +479,27 @@ export async function purchaseMarketplaceItem(
   return {
     success: true,
     message: `Purchase successful! Order reference: ${reference}`,
-    balance: response.balance_withdrawable
+    balance: response.balance_withdrawable,
+    order: createdOrder
   };
+}
+
+/**
+ * Retrieves all marketplace orders for a user.
+ */
+export async function getUserMarketplaceOrders(userId: string): Promise<MarketplaceOrder[]> {
+  try {
+    const supabase = createServiceClient();
+    const { data, error } = await (supabase as any)
+      .from("marketplace_orders")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  } catch (err) {
+    console.warn("[9jaPulse] Direct order query failed (offline). Returning empty order list:", err);
+    return [];
+  }
 }
