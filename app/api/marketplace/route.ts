@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createRequestClient } from "@/lib/supabaseServer";
 import { 
   getMarketplaceProducts, 
-  searchAndSyncTemuProducts, 
   purchaseMarketplaceItem,
   getUserMarketplaceOrders
 } from "@/lib/marketplace";
@@ -25,12 +24,7 @@ export async function GET(req: NextRequest) {
     const category = searchParams.get("category") || undefined;
     const query = searchParams.get("query") || undefined;
 
-    let products;
-    if (query && query.trim().length > 0) {
-      products = await searchAndSyncTemuProducts(query);
-    } else {
-      products = await getMarketplaceProducts(category);
-    }
+    const products = await getMarketplaceProducts(category, query);
 
     return NextResponse.json({ success: true, products });
   } catch (err: any) {

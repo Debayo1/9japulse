@@ -224,7 +224,7 @@ export async function verifyUserPin(userId: string, pin: string): Promise<boolea
 /**
  * Fetches all products from the local marketplace database.
  */
-export async function getMarketplaceProducts(category?: string): Promise<Product[]> {
+export async function getMarketplaceProducts(category?: string, searchQuery?: string): Promise<Product[]> {
   try {
     const supabase = createServiceClient();
     let query = (supabase as any).from("marketplace_products").select("*").order("created_at", { ascending: false });
@@ -233,132 +233,43 @@ export async function getMarketplaceProducts(category?: string): Promise<Product
       query = query.eq("category", category);
     }
     
+    if (searchQuery && searchQuery.trim().length > 0) {
+      query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+    }
+
     const { data, error } = await query;
     if (error) throw new Error(error.message);
-    return data && data.length > 0 ? data : SEED_PRODUCTS.filter(p => !category || category === "All" || p.category === category);
+    
+    let localSeeds = SEED_PRODUCTS;
+    if (category && category !== "All") {
+      localSeeds = localSeeds.filter(p => p.category === category);
+    }
+    if (searchQuery && searchQuery.trim().length > 0) {
+      const sq = searchQuery.toLowerCase();
+      localSeeds = localSeeds.filter(p => 
+        p.title.toLowerCase().includes(sq) || 
+        (p.description || "").toLowerCase().includes(sq)
+      );
+    }
+
+    return data && data.length > 0 ? data : localSeeds;
   } catch (err) {
     console.warn("[9jaPulse] Direct product query failed (offline). Using seed fallbacks:", err);
-    return SEED_PRODUCTS.filter(p => !category || category === "All" || p.category === category);
-  }
-}
-
-/**
- * Searches Temu products via RapidAPI and syncs them to the database.
- * If the RapidAPI key is missing or calls fail, it dynamically generates 
- * realistic mock products based on the query to allow out-of-the-box evaluation.
- */
-export async function searchAndSyncTemuProducts(searchQuery: string): Promise<Product[]> {
-  const supabase = createServiceClient();
-  const apiKey = process.env.RAPIDAPI_KEY;
-  const apiHost = process.env.RAPIDAPI_HOST || "temu-com-product-data-scraper.p.rapidapi.com";
-
-  let products: Array<{
-    id: string;
-    title: string;
-    description: string;
-    price: number;
-    image_url: string;
-    category: string;
-    rating: number;
-    stock_quantity: number;
-  }> = [];
-
-  if (apiKey) {
-    try {
-      const response = await fetch(
-        `https://${apiHost}/search?query=${encodeURIComponent(searchQuery)}&page=1`,
-        {
-          method: "GET",
-          headers: {
-            "x-rapidapi-key": apiKey,
-            "x-rapidapi-host": apiHost,
-          },
-        }
-      );
-
-      if (response.ok) {
-        const json = await response.json();
-        // Standard RapidAPI Temu JSON response mapping:
-        const items = json.data?.products || json.products || [];
-        
-        products = items.slice(0, 10).map((item: any) => {
-          const rawPrice = item.price || item.raw_price || 9.99;
-          // Temu prices are usually in USD. We translate it to NGN with a sensible exchange rate (e.g. ₦1,500/$)
-          const ngnPrice = Math.round(Number(rawPrice) * 1500);
-
-          return {
-            id: `temu-${item.product_id || item.id || Math.random().toString(36).substr(2, 9)}`,
-            title: item.product_name || item.title || "Global Quality Item",
-            description: item.description || `High quality item. Rating: ${item.rating || '4.5'}.`,
-            price: ngnPrice,
-            image_url: item.product_image || item.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500",
-            category: "Global Import",
-            rating: Number(item.rating || 4.5),
-            stock_quantity: Math.floor(Math.random() * 50) + 10,
-          };
-        });
-      }
-    } catch (err) {
-      console.warn("[9jaPulse] RapidAPI Temu request failed. Falling back to dynamic mock generation:", err);
+    let localSeeds = SEED_PRODUCTS;
+    if (category && category !== "All") {
+      localSeeds = localSeeds.filter(p => p.category === category);
     }
+    if (searchQuery && searchQuery.trim().length > 0) {
+      const sq = searchQuery.toLowerCase();
+      localSeeds = localSeeds.filter(p => 
+        p.title.toLowerCase().includes(sq) || 
+        (p.description || "").toLowerCase().includes(sq)
+      );
+    }
+    return localSeeds;
   }
-
-  // Fallback Dynamic Mock Product Generation
-  if (products.length === 0) {
-    const categories = ["Electronics", "Fashion", "Gadgets", "Home"];
-    const selectedCategory = categories[Math.floor(Math.random() * categories.length)];
-    
-    products = [
-      {
-        id: `mock-t-${Date.now()}-1`,
-        title: `${searchQuery} Ultra-Slim Edition`,
-        description: `Premium grade ${searchQuery} designed for maximum efficiency and modern portability. Superb choice for everyday use.`,
-        price: Math.round((Math.random() * 12000) + 2500),
-        image_url: "https://images.unsplash.com/photo-1498049794561-7780e7231661?w=500",
-        category: selectedCategory,
-        rating: 4.7,
-        stock_quantity: 40,
-      },
-      {
-        id: `mock-t-${Date.now()}-2`,
-        title: `Premium Choice ${searchQuery}`,
-        description: `Original premium choice edition of ${searchQuery}. High durability, sleek aesthetics, and cheap shipping rates to Nigeria.`,
-        price: Math.round((Math.random() * 18000) + 4000),
-        image_url: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500",
-        category: selectedCategory,
-        rating: 4.4,
-        stock_quantity: 25,
-      },
-      {
-        id: `mock-t-${Date.now()}-3`,
-        title: `Mini Pocket ${searchQuery}`,
-        description: `Compact version of the standard ${searchQuery}. Fits comfortably anywhere. High utility with zero bulk.`,
-        price: Math.round((Math.random() * 6000) + 1500),
-        image_url: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=500",
-        category: selectedCategory,
-        rating: 4.2,
-        stock_quantity: 80,
-      }
-    ];
-  }
-
-  // Upsert products to database to persist search results in local catalog cache
-  for (const prod of products) {
-    await (supabase as any).from("marketplace_products").upsert({
-      id: prod.id,
-      title: prod.title,
-      description: prod.description,
-      price: prod.price,
-      image_url: prod.image_url,
-      category: prod.category,
-      rating: prod.rating,
-      stock_quantity: prod.stock_quantity,
-      updated_at: new Date().toISOString()
-    });
-  }
-
-  return getMarketplaceProducts();
 }
+
 
 export interface ShippingDetails {
   name: string;
