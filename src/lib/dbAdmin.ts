@@ -152,6 +152,7 @@ export async function ensureDbColumnsExist(): Promise<void> {
 
     // Seed initial marketplace products if empty
     // Seed initial marketplace products if empty
+    await client.query(`
       INSERT INTO public.marketplace_products (id, title, description, price, image_url, category, rating, stock_quantity)
       VALUES
         ('prod-1', 'Pro Noise-Cancelling Headphones', 'Over-ear wireless headphones with active noise cancellation, 30hr battery, and Hi-Fi stereo sound.', 15000.00, 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500', 'Electronics', 4.8, 50),

@@ -44,7 +44,7 @@ export default function AdminConsole({
   initialSettings,
   initialKeys,
 }: AdminConsoleProps) {
-  const [activeTab, setActiveTab] = useState<"overview" | "users" | "txns" | "keys" | "settings">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "users" | "txns" | "keys" | "settings" | "products">("overview");
   const [isPending, startTransition] = useTransition();
 
   // Local lists

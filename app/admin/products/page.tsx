@@ -6,6 +6,8 @@ import { Plus, Trash, PencilSimple, X, Check, Image as ImageIcon, Package } from
 import Header from "@/components/Header";
 import { toast } from "sonner";
 
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
+
 interface Product {
   id: string;
   title: string;
@@ -43,7 +45,27 @@ export default function AdminProductsPage() {
   const [previewImg, setPreviewImg] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchProducts();
+    async function checkAdmin() {
+      const { data: { session } } = await supabaseBrowser.auth.getSession();
+      if (!session) {
+        router.replace("/login");
+        return;
+      }
+      
+      const { data: profile } = await (supabaseBrowser
+        .from("profiles")
+        .select("role")
+        .eq("id", session.user.id)
+        .single() as any);
+        
+      if (profile?.role !== "admin") {
+        router.replace("/home");
+        return;
+      }
+      
+      fetchProducts();
+    }
+    checkAdmin();
   }, []);
 
   async function fetchProducts() {
