@@ -134,11 +134,21 @@ export async function ensureDbColumnsExist(): Promise<void> {
     await client.query(`
       INSERT INTO public.marketplace_products (id, title, description, price, image_url, category, rating, stock_quantity)
       VALUES
-        ('temu-1', 'Temu Airpods Max Pro Clone', 'Premium wireless noise cancelling over-ear headphones with stereo sound.', 15000.00, 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500', 'Electronics', 4.8, 50),
+        ('temu-1', 'Airpods Max Pro Series', 'Premium wireless noise cancelling over-ear headphones with stereo sound.', 15000.00, 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500', 'Electronics', 4.8, 50),
         ('temu-2', 'Smart Watch Series 9', 'Heart rate monitoring, fitness tracking, AMOLED screen and long battery life.', 8500.00, 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500', 'Electronics', 4.5, 30),
-        ('temu-3', 'Temu Multi-pocket Cargo Pants', 'Streetwear loose-fit cotton cargo trousers for casual utility fashion.', 12000.00, 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=500', 'Fashion', 4.3, 100),
-        ('temu-4', 'Minimalist Leather Wallet', 'Slim bifold carbon fiber design with RFID protection.', 4500.00, 'https://images.unsplash.com/photo-1627124765135-56c33fc36baf?w=500', 'Fashion', 4.6, 120),
-        ('temu-5', 'Ultralight Portable Bluetooth Speaker', 'IPX7 waterproof wireless speaker for outdoor hiking and camping.', 7500.00, 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=500', 'Electronics', 4.7, 45)
+        ('temu-3', 'Multi-pocket Utility Cargo Pants', 'Streetwear loose-fit cotton cargo trousers for casual utility fashion.', 12000.00, 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=500', 'Fashion', 4.3, 100),
+        ('temu-4', 'Minimalist RFID Leather Wallet', 'Slim bifold carbon fiber design with RFID blocking protection.', 4500.00, 'https://images.unsplash.com/photo-1627124765135-56c33fc36baf?w=500', 'Fashion', 4.6, 120),
+        ('temu-5', 'Ultralight Portable Bluetooth Speaker', 'IPX7 waterproof wireless speaker for outdoor hiking and camping.', 7500.00, 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=500', 'Electronics', 4.7, 45),
+        ('temu-6', 'LED RGB Smart Atmosphere Table Lamp', 'Color-changing bedside desktop nightlight with phone App controls.', 6200.00, 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=500', 'Electronics', 4.4, 70),
+        ('temu-7', 'Unisex Classic Aviator Sunglasses', 'Premium polarized UV400 lenses with lightweight metallic frames.', 3500.00, 'https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=500', 'Fashion', 4.6, 85),
+        ('temu-8', 'Waterproof Multi-pocket Travel Backpack', 'Large capacity travel bag with USB charging port and laptop sleeve.', 11500.00, 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500', 'Fashion', 4.8, 40),
+        ('temu-9', 'Rechargeable Handheld Turbo Fan', 'High-speed mini cooling fan with adjustable 3 speeds for hot weather.', 3800.00, 'https://images.unsplash.com/photo-1585338107529-13afc5f02586?w=500', 'Gadgets', 4.3, 150),
+        ('temu-10', 'Smart Key Finder Bluetooth Tracker', 'Anti-lost locator alarm tag for keys, wallet, and luggage tracking.', 2500.00, 'https://images.unsplash.com/photo-1584438784894-089d6a128f3e?w=500', 'Gadgets', 4.1, 200),
+        ('temu-11', 'HD Dual-Lens Car Dash Camera', '1080P dashboard recorder with night vision and loop G-sensor recording.', 24500.00, 'https://images.unsplash.com/photo-1508962914676-134849a727f0?w=500', 'Gadgets', 4.7, 25),
+        ('temu-12', 'Ergonomic Vertical Wireless Mouse', 'Sleek optical mouse designed to reduce wrist strain with adjustable DPI.', 5500.00, 'https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=500', 'Gadgets', 4.5, 60),
+        ('temu-13', 'Ultrasonic Aroma Diffuser Humidifier', 'Wood grain desktop humidifier with 7 LED light color modes.', 5800.00, 'https://images.unsplash.com/photo-1602928321679-560bb453f190?w=500', 'Home', 4.6, 80),
+        ('temu-14', 'Stainless Temperature Control Tumbler', 'Double-wall vacuum insulated smart flask displaying drink temp.', 3900.00, 'https://images.unsplash.com/photo-1577937927133-66ef06acdf18?w=500', 'Home', 4.4, 110),
+        ('temu-15', 'Portable Electric Smoothie Blender Cup', 'USB rechargeable mini juice blender with high speed mixing blades.', 8200.00, 'https://images.unsplash.com/photo-1578643463396-0997cb5328c1?w=500', 'Home', 4.5, 65)
       ON CONFLICT (id) DO NOTHING;
     `);
 

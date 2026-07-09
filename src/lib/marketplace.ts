@@ -47,8 +47,8 @@ const SEED_PRODUCTS: Product[] = [
   },
   {
     id: "temu-4",
-    title: "Minimalist Leather Wallet",
-    description: "Slim bifold carbon fiber design with RFID protection.",
+    title: "Minimalist RFID Leather Wallet",
+    description: "Slim bifold carbon fiber design with RFID blocking protection.",
     price: 4500.00,
     image_url: "https://images.unsplash.com/photo-1627124765135-56c33fc36baf?w=500",
     category: "Fashion",
@@ -64,6 +64,106 @@ const SEED_PRODUCTS: Product[] = [
     category: "Electronics",
     rating: 4.7,
     stock_quantity: 45
+  },
+  {
+    id: "temu-6",
+    title: "LED RGB Smart Atmosphere Table Lamp",
+    description: "Color-changing bedside desktop nightlight with phone App controls.",
+    price: 6200.00,
+    image_url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=500",
+    category: "Electronics",
+    rating: 4.4,
+    stock_quantity: 70
+  },
+  {
+    id: "temu-7",
+    title: "Unisex Classic Aviator Sunglasses",
+    description: "Premium polarized UV400 lenses with lightweight metallic frames.",
+    price: 3500.00,
+    image_url: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=500",
+    category: "Fashion",
+    rating: 4.6,
+    stock_quantity: 85
+  },
+  {
+    id: "temu-8",
+    title: "Waterproof Multi-pocket Travel Backpack",
+    description: "Large capacity travel bag with USB charging port and laptop sleeve.",
+    price: 11500.00,
+    image_url: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500",
+    category: "Fashion",
+    rating: 4.8,
+    stock_quantity: 40
+  },
+  {
+    id: "temu-9",
+    title: "Rechargeable Handheld Turbo Fan",
+    description: "High-speed mini cooling fan with adjustable 3 speeds for hot weather.",
+    price: 3800.00,
+    image_url: "https://images.unsplash.com/photo-1585338107529-13afc5f02586?w=500",
+    category: "Gadgets",
+    rating: 4.3,
+    stock_quantity: 150
+  },
+  {
+    id: "temu-10",
+    title: "Smart Key Finder Bluetooth Tracker",
+    description: "Anti-lost locator alarm tag for keys, wallet, and luggage tracking.",
+    price: 2500.00,
+    image_url: "https://images.unsplash.com/photo-1584438784894-089d6a128f3e?w=500",
+    category: "Gadgets",
+    rating: 4.1,
+    stock_quantity: 200
+  },
+  {
+    id: "temu-11",
+    title: "HD Dual-Lens Car Dash Camera",
+    description: "1080P dashboard recorder with night vision and loop G-sensor recording.",
+    price: 24500.00,
+    image_url: "https://images.unsplash.com/photo-1508962914676-134849a727f0?w=500",
+    category: "Gadgets",
+    rating: 4.7,
+    stock_quantity: 25
+  },
+  {
+    id: "temu-12",
+    title: "Ergonomic Vertical Wireless Mouse",
+    description: "Sleek optical mouse designed to reduce wrist strain with adjustable DPI.",
+    price: 5500.00,
+    image_url: "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=500",
+    category: "Gadgets",
+    rating: 4.5,
+    stock_quantity: 60
+  },
+  {
+    id: "temu-13",
+    title: "Ultrasonic Aroma Diffuser Humidifier",
+    description: "Wood grain desktop humidifier with 7 LED light color modes.",
+    price: 5800.00,
+    image_url: "https://images.unsplash.com/photo-1602928321679-560bb453f190?w=500",
+    category: "Home",
+    rating: 4.6,
+    stock_quantity: 80
+  },
+  {
+    id: "temu-14",
+    title: "Stainless Temperature Control Tumbler",
+    description: "Double-wall vacuum insulated smart flask displaying drink temp.",
+    price: 3900.00,
+    image_url: "https://images.unsplash.com/photo-1577937927133-66ef06acdf18?w=500",
+    category: "Home",
+    rating: 4.4,
+    stock_quantity: 110
+  },
+  {
+    id: "temu-15",
+    title: "Portable Electric Smoothie Blender Cup",
+    description: "USB rechargeable mini juice blender with high speed mixing blades.",
+    price: 8200.00,
+    image_url: "https://images.unsplash.com/photo-1578643463396-0997cb5328c1?w=500",
+    category: "Home",
+    rating: 4.5,
+    stock_quantity: 65
   }
 ];
 
