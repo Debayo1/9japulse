@@ -17,9 +17,9 @@ export interface Product {
 
 const SEED_PRODUCTS: Product[] = [
   {
-    id: "temu-1",
-    title: "Airpods Max Pro Series",
-    description: "Premium wireless noise cancelling over-ear headphones with stereo sound.",
+    id: "prod-1",
+    title: "Pro Noise-Cancelling Headphones",
+    description: "Over-ear wireless headphones with active noise cancellation, 30hr battery, and Hi-Fi stereo sound.",
     price: 15000.00,
     image_url: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500",
     category: "Electronics",
@@ -27,14 +27,14 @@ const SEED_PRODUCTS: Product[] = [
     stock_quantity: 50,
     images: [
       "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500",
-      "https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=500",
-      "https://images.unsplash.com/photo-1484704849700-f032a568e944?w=500"
+      "https://images.unsplash.com/photo-1484704849700-f032a568e944?w=500",
+      "https://images.unsplash.com/photo-1524678606370-a47ad25cb82a?w=500"
     ]
   },
   {
-    id: "temu-2",
-    title: "Smart Watch Series 9",
-    description: "Heart rate monitoring, fitness tracking, AMOLED screen and long battery life.",
+    id: "prod-2",
+    title: "Smart Fitness Watch",
+    description: "Heart rate monitoring, sleep tracking, AMOLED display and 7-day battery life.",
     price: 8500.00,
     image_url: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500",
     category: "Electronics",
@@ -47,9 +47,9 @@ const SEED_PRODUCTS: Product[] = [
     ]
   },
   {
-    id: "temu-3",
-    title: "Multi-pocket Utility Cargo Pants",
-    description: "Streetwear loose-fit cotton cargo trousers for casual utility fashion.",
+    id: "prod-3",
+    title: "Utility Cargo Trousers",
+    description: "Streetwear loose-fit multi-pocket cargo pants with drawstring waist and durable cotton build.",
     price: 12000.00,
     image_url: "https://images.unsplash.com/photo-1542272604-787c3835535d?w=500",
     category: "Fashion",
@@ -62,9 +62,9 @@ const SEED_PRODUCTS: Product[] = [
     ]
   },
   {
-    id: "temu-4",
-    title: "Minimalist RFID Leather Wallet",
-    description: "Slim bifold carbon fiber design with RFID blocking protection.",
+    id: "prod-4",
+    title: "Slim RFID Leather Wallet",
+    description: "Ultra-thin bifold wallet with RFID blocking technology and premium carbon finish.",
     price: 4500.00,
     image_url: "https://images.unsplash.com/photo-1627124765135-56c33fc36baf?w=500",
     category: "Fashion",
@@ -72,19 +72,23 @@ const SEED_PRODUCTS: Product[] = [
     stock_quantity: 120
   },
   {
-    id: "temu-5",
-    title: "Ultralight Portable Bluetooth Speaker",
-    description: "IPX7 waterproof wireless speaker for outdoor hiking and camping.",
+    id: "prod-5",
+    title: "Waterproof Bluetooth Speaker",
+    description: "IPX7-rated portable wireless speaker with 360° rich bass sound for outdoors.",
     price: 7500.00,
     image_url: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=500",
     category: "Electronics",
     rating: 4.7,
-    stock_quantity: 45
+    stock_quantity: 45,
+    images: [
+      "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=500",
+      "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=500"
+    ]
   },
   {
-    id: "temu-6",
-    title: "LED RGB Smart Atmosphere Table Lamp",
-    description: "Color-changing bedside desktop nightlight with phone App controls.",
+    id: "prod-6",
+    title: "RGB LED Desk Lamp",
+    description: "Smart color-changing bedside lamp with 16 million colors and app-controlled lighting modes.",
     price: 6200.00,
     image_url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=500",
     category: "Electronics",
@@ -92,29 +96,37 @@ const SEED_PRODUCTS: Product[] = [
     stock_quantity: 70
   },
   {
-    id: "temu-7",
-    title: "Unisex Classic Aviator Sunglasses",
-    description: "Premium polarized UV400 lenses with lightweight metallic frames.",
+    id: "prod-7",
+    title: "Polarized Aviator Sunglasses",
+    description: "Classic gold-frame aviator shades with UV400 polarized lenses for style and eye protection.",
     price: 3500.00,
     image_url: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=500",
     category: "Fashion",
     rating: 4.6,
-    stock_quantity: 85
+    stock_quantity: 85,
+    images: [
+      "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=500",
+      "https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=500"
+    ]
   },
   {
-    id: "temu-8",
-    title: "Waterproof Multi-pocket Travel Backpack",
-    description: "Large capacity travel bag with USB charging port and laptop sleeve.",
+    id: "prod-8",
+    title: "Large Travel Backpack",
+    description: "40L waterproof backpack with USB charging port, laptop sleeve and anti-theft pockets.",
     price: 11500.00,
     image_url: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500",
     category: "Fashion",
     rating: 4.8,
-    stock_quantity: 40
+    stock_quantity: 40,
+    images: [
+      "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500",
+      "https://images.unsplash.com/photo-1622560480605-d83c853bc5c3?w=500"
+    ]
   },
   {
-    id: "temu-9",
-    title: "Rechargeable Handheld Turbo Fan",
-    description: "High-speed mini cooling fan with adjustable 3 speeds for hot weather.",
+    id: "prod-9",
+    title: "Portable Rechargeable Fan",
+    description: "USB mini turbo fan with 3 wind speeds and 8-hour battery — perfect for the Nigerian heat.",
     price: 3800.00,
     image_url: "https://images.unsplash.com/photo-1585338107529-13afc5f02586?w=500",
     category: "Gadgets",
@@ -122,9 +134,9 @@ const SEED_PRODUCTS: Product[] = [
     stock_quantity: 150
   },
   {
-    id: "temu-10",
-    title: "Smart Key Finder Bluetooth Tracker",
-    description: "Anti-lost locator alarm tag for keys, wallet, and luggage tracking.",
+    id: "prod-10",
+    title: "Bluetooth GPS Key Tracker",
+    description: "Compact anti-lost tracker for keys, bags, and wallets with 90dB alarm ring.",
     price: 2500.00,
     image_url: "https://images.unsplash.com/photo-1584438784894-089d6a128f3e?w=500",
     category: "Gadgets",
@@ -132,9 +144,9 @@ const SEED_PRODUCTS: Product[] = [
     stock_quantity: 200
   },
   {
-    id: "temu-11",
-    title: "HD Dual-Lens Car Dash Camera",
-    description: "1080P dashboard recorder with night vision and loop G-sensor recording.",
+    id: "prod-11",
+    title: "1080P Dashcam with Night Vision",
+    description: "Dual-lens dashboard recorder with loop recording, G-sensor, and clear night-time footage.",
     price: 24500.00,
     image_url: "https://images.unsplash.com/photo-1508962914676-134849a727f0?w=500",
     category: "Gadgets",
@@ -142,9 +154,9 @@ const SEED_PRODUCTS: Product[] = [
     stock_quantity: 25
   },
   {
-    id: "temu-12",
-    title: "Ergonomic Vertical Wireless Mouse",
-    description: "Sleek optical mouse designed to reduce wrist strain with adjustable DPI.",
+    id: "prod-12",
+    title: "Ergonomic Vertical Mouse",
+    description: "Wireless vertical mouse that corrects wrist posture and reduces RSI with adjustable DPI.",
     price: 5500.00,
     image_url: "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=500",
     category: "Gadgets",
@@ -152,9 +164,9 @@ const SEED_PRODUCTS: Product[] = [
     stock_quantity: 60
   },
   {
-    id: "temu-13",
-    title: "Ultrasonic Aroma Diffuser Humidifier",
-    description: "Wood grain desktop humidifier with 7 LED light color modes.",
+    id: "prod-13",
+    title: "Aroma Diffuser & Humidifier",
+    description: "Ultrasonic wood-grain humidifier with 7 color LED modes and essential oil diffusing.",
     price: 5800.00,
     image_url: "https://images.unsplash.com/photo-1602928321679-560bb453f190?w=500",
     category: "Home",
@@ -162,9 +174,9 @@ const SEED_PRODUCTS: Product[] = [
     stock_quantity: 80
   },
   {
-    id: "temu-14",
-    title: "Stainless Temperature Control Tumbler",
-    description: "Double-wall vacuum insulated smart flask displaying drink temp.",
+    id: "prod-14",
+    title: "Insulated Temperature Flask",
+    description: "Double-wall stainless steel vacuum flask that keeps drinks hot or cold for 12 hours.",
     price: 3900.00,
     image_url: "https://images.unsplash.com/photo-1577937927133-66ef06acdf18?w=500",
     category: "Home",
@@ -172,16 +184,18 @@ const SEED_PRODUCTS: Product[] = [
     stock_quantity: 110
   },
   {
-    id: "temu-15",
-    title: "Portable Electric Smoothie Blender Cup",
-    description: "USB rechargeable mini juice blender with high speed mixing blades.",
+    id: "prod-15",
+    title: "USB Portable Blender Cup",
+    description: "Rechargeable mini smoothie blender with 6-blade stainless cutter and leak-proof lid.",
     price: 8200.00,
-    image_url: "https://images.unsplash.com/photo-1578643463396-0997cb5328c1?w=500",
+    image_url: "https://images.unsplash.com/photo-1570197788417-0e82375c9371?w=500",
     category: "Home",
     rating: 4.5,
     stock_quantity: 65
   }
 ];
+
+
 
 /**
  * Verifies a user's transaction PIN.

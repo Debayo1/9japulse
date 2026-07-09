@@ -61,9 +61,15 @@ export default function MarketplacePage() {
   const [searching, setSearching] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All");
 
+  // Splash screen
+  const [showSplash, setShowSplash] = useState(true);
+
   // Selected Product details view
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
   const [activeImgIndex, setActiveImgIndex] = useState(0);
+
+  // Quantity selector
+  const [quantity, setQuantity] = useState(1);
 
   // Tab State
   const [activeTab, setActiveTab] = useState<"catalog" | "orders">("catalog");
@@ -204,6 +210,7 @@ export default function MarketplacePage() {
     setCheckoutProduct(product);
     setOpenShippingModal(true); // show shipping collector first!
     setPin("");
+    setQuantity(1);
   };
 
   const handlePurchase = async () => {
@@ -217,6 +224,7 @@ export default function MarketplacePage() {
         body: JSON.stringify({
           productId: checkoutProduct.id,
           pin: pin,
+          quantity: quantity,
           shippingDetails: shippingDetails
         })
       });
@@ -335,42 +343,64 @@ export default function MarketplacePage() {
     );
   }
 
+  // Splash screen
+  if (showSplash) {
+    return (
+      <div style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 999,
+        background: "linear-gradient(160deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "1.5rem",
+        animation: "fade-in 0.4s ease"
+      }}>
+        <div style={{
+          width: 80,
+          height: 80,
+          borderRadius: 24,
+          background: "linear-gradient(135deg, var(--color-primary), var(--color-accent))",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: "0 0 48px rgba(99,102,241,0.5)",
+          animation: "pulse 1.5s ease-in-out infinite"
+        }}>
+          <ShoppingCart size={40} weight="fill" color="white" />
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <h1 style={{ fontSize: "1.75rem", fontWeight: 900, margin: 0, letterSpacing: "-0.03em", color: "white" }}>9jaPulse Store</h1>
+          <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.875rem", marginTop: "0.5rem" }}>Premium global products · Fast Nigerian delivery</p>
+        </div>
+        <div style={{ display: "flex", gap: "8px", marginTop: "0.5rem" }}>
+          {[0,1,2].map(i => (
+            <div key={i} style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              backgroundColor: "var(--color-primary)",
+              opacity: 0.3 + i * 0.35,
+              animation: `pulse ${0.8 + i * 0.2}s ease-in-out infinite`
+            }} />
+          ))}
+        </div>
+        <button
+          onClick={() => setShowSplash(false)}
+          className="btn btn-primary"
+          style={{ marginTop: "1rem", padding: "0.75rem 2rem", fontSize: "0.9375rem", fontWeight: 800 }}
+        >
+          Browse Products
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="page" style={{ paddingBottom: "3rem" }}>
       <Header title="Global Store" showBack={true} />
-
-      {/* Hero promo card */}
-      <div
-        className="card animate-fade-in"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
-          marginBottom: "1.25rem",
-          background: "linear-gradient(135deg, var(--color-primary) 15%, var(--color-accent) 100%)",
-          color: "white",
-          border: "none",
-          padding: "1.25rem"
-        }}
-      >
-        <div style={{
-          width: 44,
-          height: 44,
-          borderRadius: 12,
-          backgroundColor: "rgba(255,255,255,0.2)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center"
-        }}>
-          <Sparkle size={24} weight="fill" />
-        </div>
-        <div>
-          <h2 style={{ fontSize: "0.9375rem", fontWeight: 800, margin: 0, letterSpacing: "-0.01em" }}>Direct Global Imports</h2>
-          <p style={{ fontSize: "0.75rem", opacity: 0.9, marginTop: "2px" }}>
-            Shop premium authentic items at factory rates. Standard shipping to Nigeria funded natively via 9jaPulse.
-          </p>
-        </div>
-      </div>
 
       {/* Tab Switcher: Browse vs My Orders */}
       <div style={{
@@ -787,21 +817,36 @@ export default function MarketplacePage() {
               {viewProduct.description}
             </p>
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "0.5rem", borderTop: "1px solid var(--border)", paddingTop: "1rem" }}>
-              <div>
-                <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)" }}>Unit Price</span>
-                <p style={{ fontSize: "1.25rem", fontWeight: 900, color: "var(--text-primary)", margin: 0 }}>
-                  ₦{viewProduct.price.toLocaleString()}
-                </p>
+            <div style={{ borderTop: "1px solid var(--border)", paddingTop: "1rem", marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {/* Quantity + Total */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)" }}>Unit Price</span>
+                  <p style={{ fontSize: "1.125rem", fontWeight: 900, color: "var(--text-primary)", margin: 0 }}>
+                    ₦{viewProduct.price.toLocaleString()}
+                  </p>
+                </div>
+                {/* Quantity stepper */}
+                <div style={{ display: "flex", alignItems: "center", gap: "0px", border: "1px solid var(--border)", borderRadius: "10px", overflow: "hidden" }}>
+                  <button
+                    onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                    style={{ width: 36, height: 36, border: "none", background: "var(--bg-elevated)", color: "var(--text-primary)", fontSize: "1.125rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                  >−</button>
+                  <span style={{ width: 32, textAlign: "center", fontWeight: 800, fontSize: "0.9375rem" }}>{quantity}</span>
+                  <button
+                    onClick={() => setQuantity(q => Math.min(viewProduct.stock_quantity, q + 1))}
+                    style={{ width: 36, height: 36, border: "none", background: "var(--bg-elevated)", color: "var(--color-primary)", fontSize: "1.125rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                  >+</button>
+                </div>
               </div>
 
               <button
                 onClick={() => triggerCheckout(viewProduct)}
                 className="btn btn-primary"
-                style={{ display: "flex", alignItems: "center", gap: "6px", height: "42px", padding: "0 1.5rem" }}
+                style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", height: "46px", fontSize: "0.9375rem" }}
               >
-                <ShoppingCart size={16} weight="bold" />
-                Order Now
+                <ShoppingCart size={18} weight="bold" />
+                Order {quantity > 1 ? `${quantity}x` : ""} — ₦{(viewProduct.price * quantity).toLocaleString()}
               </button>
             </div>
           </div>
