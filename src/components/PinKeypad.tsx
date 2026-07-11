@@ -10,6 +10,8 @@ interface PinKeypadProps {
   onClose: () => void;
   loading?: boolean;
   error?: string;
+  loadingTitle?: string;
+  loadingSubtitle?: string;
   children?: React.ReactNode;
 }
 
@@ -20,6 +22,8 @@ export default function PinKeypad({
   onClose,
   loading = false,
   error,
+  loadingTitle = "Verifying PIN...",
+  loadingSubtitle = "Processing your transaction",
   children,
 }: PinKeypadProps) {
   const [pin, setPin] = useState("");
@@ -217,10 +221,10 @@ export default function PinKeypad({
             animation: "pin-spin 0.7s linear infinite",
           }} />
           <p style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
-            Verifying PIN...
+            {loadingTitle}
           </p>
           <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: 0 }}>
-            Processing your transaction
+            {loadingSubtitle}
           </p>
         </div>
       )}
