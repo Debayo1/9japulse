@@ -115,6 +115,19 @@ export async function POST(req: NextRequest) {
 
     // ── 5. Generate request_id for idempotency ───────────────────────────────
     const requestId = idempotency_key ?? crypto.randomUUID();
+    const svc = createServiceClient();
+    const { data: existingReq } = await (svc as any)
+      .from("transactions")
+      .select("id, status")
+      .eq("request_id", requestId)
+      .maybeSingle();
+    if (existingReq) {
+      return NextResponse.json({
+        success: existingReq.status === "success",
+        reference: existingReq.id,
+        idempotent: true,
+      });
+    }
 
     // ── 6. Deduct funds atomically (with idempotency) ────────────────────────
     const ledgerRes = await applyTransaction(wallet.id, {
@@ -135,7 +148,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const svc = createServiceClient();
+    
 
     try {
       // ── 7. Call Payment Provider (GSubz) ─────────────────────────────────

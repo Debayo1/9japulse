@@ -1,12 +1,69 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Envelope, Lock, Eye, EyeSlash, User, Phone, Key, ArrowLeft, ArrowRight } from "@phosphor-icons/react";
+import { Envelope, Lock, Eye, EyeSlash, User, Phone, ArrowLeft, ArrowRight, Backspace } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { signUp } from "@/lib/auth";
 
+/* ── PIN Keypad Component ────────────────────────────────────────── */
+function PinKeypad({
+  value,
+  maxLength = 4,
+  onChange,
+  error,
+}: {
+  value: string;
+  maxLength?: number;
+  onChange: (val: string) => void;
+  error?: boolean;
+}) {
+  const handleKey = useCallback(
+    (digit: string) => {
+      if (value.length < maxLength) {
+        onChange(value + digit);
+      }
+    },
+    [value, maxLength, onChange]
+  );
+
+  const handleDelete = useCallback(() => {
+    onChange(value.slice(0, -1));
+  }, [value, onChange]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+      {/* PIN dots */}
+      <div className="pin-dots">
+        {Array.from({ length: maxLength }).map((_, i) => (
+          <div
+            key={i}
+            className={`pin-dot ${i < value.length ? "filled" : ""} ${error && i < value.length ? "error" : ""}`}
+          />
+        ))}
+      </div>
+
+      {/* Keypad grid */}
+      <div className="pin-keypad">
+        {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
+          <button key={d} type="button" className="pin-key" onClick={() => handleKey(d)}>
+            {d}
+          </button>
+        ))}
+        <div className="pin-key pin-key-empty" />
+        <button type="button" className="pin-key" onClick={() => handleKey("0")}>
+          0
+        </button>
+        <button type="button" className="pin-key pin-key-action" onClick={handleDelete} aria-label="Delete">
+          <Backspace size={22} weight="regular" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Register Page ───────────────────────────────────────────────── */
 export default function RegisterPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -24,6 +81,7 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
+  const [pinPhase, setPinPhase] = useState<"set" | "confirm">("set");
 
   const nextStep1 = () => {
     if (!fullName.trim()) {
@@ -51,23 +109,43 @@ export default function RegisterPage() {
       return;
     }
     setStep(3);
+    setPinPhase("set");
+    setPin("");
+    setConfirmPin("");
   };
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (pin.length !== 4 || !/^\d+$/.test(pin)) {
-      toast.error("Transaction PIN must be a 4-digit number");
-      return;
+  // PIN auto-advance logic
+  const handlePinChange = (val: string) => {
+    if (pinPhase === "set") {
+      setPin(val);
+      if (val.length === 4) {
+        // Small delay then move to confirm
+        setTimeout(() => {
+          setPinPhase("confirm");
+        }, 300);
+      }
+    } else {
+      setConfirmPin(val);
+      if (val.length === 4) {
+        // Auto-submit after a short delay
+        setTimeout(() => {
+          if (val !== pin) {
+            toast.error("PINs do not match");
+            setConfirmPin("");
+          } else {
+            // Submit registration
+            handleFinalSubmit();
+          }
+        }, 300);
+      }
     }
-    if (pin !== confirmPin) {
-      toast.error("Transaction PINs do not match");
-      return;
-    }
+  };
 
+  const handleFinalSubmit = () => {
     startTransition(async () => {
       try {
         await signUp(email, password, fullName, phone, pin);
-        toast.success("Account created successfully! You can now log in.");
+        toast.success("Account created! You can now log in.");
         router.push("/login");
       } catch (err: unknown) {
         toast.error((err as Error).message ?? "Registration failed");
@@ -75,262 +153,226 @@ export default function RegisterPage() {
     });
   };
 
+  const stepLabels = ["Personal Info", "Password", "Transaction PIN"];
+
   return (
-    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", justifyContent: "center", padding: "2.5rem 1.5rem", maxWidth: 420, margin: "0 auto" }}>
-      {/* Brand Header */}
-      <div style={{ textAlign: "left", marginBottom: "2rem" }}>
-        <div style={{ width: 56, height: 56, borderRadius: 16, background: "linear-gradient(135deg, var(--color-primary), var(--color-accent))", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 0 1.25rem 0", fontSize: "1.5rem", fontWeight: 900, color: "white", boxShadow: "var(--shadow-glow)" }}>
-          ₦
-        </div>
-        <h1 style={{ fontSize: "1.875rem", fontWeight: 800, letterSpacing: "-0.03em", margin: 0 }}>Create Account</h1>
-        <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem", marginTop: "0.375rem" }}>
-          {step === 1 && "Enter your basic contact details"}
-          {step === 2 && "Configure your account password"}
-          {step === 3 && "Secure your transactions with a PIN"}
+    <div className="auth-page">
+      {/* Heading */}
+      <div className="auth-heading">
+        <h1>Create Account</h1>
+        <p>
+          {step === 1 && "Enter your personal details"}
+          {step === 2 && "Set up your account password"}
+          {step === 3 && pinPhase === "set" && "Choose a 4-digit PIN"}
+          {step === 3 && pinPhase === "confirm" && "Confirm your PIN"}
         </p>
       </div>
 
-      {/* Stepper Progress Bar */}
-      <div style={{ marginBottom: "2rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)", marginBottom: "0.5rem" }}>
-          <span>STEP {step} OF 3</span>
-          <span>{step === 1 ? "Personal Info" : step === 2 ? "Security Code" : "Transaction PIN"}</span>
+      {/* Step Progress */}
+      <div style={{ marginBottom: "1.5rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.6875rem", fontWeight: 600, color: "var(--text-muted)", marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          <span>Step {step} of 3</span>
+          <span>{stepLabels[step - 1]}</span>
         </div>
-        <div style={{ height: "4px", width: "100%", backgroundColor: "var(--border)", borderRadius: "99px", overflow: "hidden" }}>
+        <div style={{ height: "3px", width: "100%", backgroundColor: "var(--border)", borderRadius: "99px", overflow: "hidden" }}>
           <div
             style={{
               height: "100%",
               width: step === 1 ? "33%" : step === 2 ? "66%" : "100%",
               backgroundColor: "var(--color-primary)",
               borderRadius: "99px",
-              transition: "width 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+              transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
             }}
           />
         </div>
       </div>
 
-      {/* Forms stepper wrapper */}
-      <div className="animate-slide-up">
-        {/* STEP 1: Personal Details */}
-        {step === 1 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-            <div>
-              <label htmlFor="reg-name" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)", display: "block", marginBottom: "0.5rem" }}>
-                Full Name
-              </label>
-              <div style={{ position: "relative" }}>
-                <User size={18} weight="regular" color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                <input
-                  id="reg-name"
-                  type="text"
-                  placeholder="Enter your full name"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required
-                  className="input"
-                  style={{ paddingLeft: "2.75rem" }}
-                />
-              </div>
+      {/* ── STEP 1: Personal Details ──────────────────────────────────── */}
+      {step === 1 && (
+        <div className="animate-scale-in" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <div>
+            <label htmlFor="reg-name" style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: "0.375rem" }}>
+              Full Name
+            </label>
+            <div style={{ position: "relative" }}>
+              <User size={18} weight="regular" color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+              <input
+                id="reg-name"
+                type="text"
+                placeholder="Enter your full name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+                className="input"
+                style={{ paddingLeft: "2.75rem" }}
+              />
             </div>
+          </div>
 
-            <div>
-              <label htmlFor="reg-phone" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)", display: "block", marginBottom: "0.5rem" }}>
-                Phone Number
-              </label>
-              <div style={{ position: "relative" }}>
-                <Phone size={18} weight="regular" color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                <input
-                  id="reg-phone"
-                  type="tel"
-                  placeholder="e.g. 08012345678"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, "").slice(0, 11))}
-                  required
-                  className="input"
-                  style={{ paddingLeft: "2.75rem" }}
-                />
-              </div>
+          <div>
+            <label htmlFor="reg-phone" style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: "0.375rem" }}>
+              Phone Number
+            </label>
+            <div style={{ position: "relative" }}>
+              <Phone size={18} weight="regular" color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+              <input
+                id="reg-phone"
+                type="tel"
+                placeholder="e.g. 08012345678"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, "").slice(0, 11))}
+                required
+                className="input"
+                style={{ paddingLeft: "2.75rem" }}
+              />
             </div>
+          </div>
 
-            <div>
-              <label htmlFor="reg-email" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)", display: "block", marginBottom: "0.5rem" }}>
-                Email Address
-              </label>
-              <div style={{ position: "relative" }}>
-                <Envelope size={18} weight="regular" color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                <input
-                  id="reg-email"
-                  type="email"
-                  placeholder="e.g. name@gmail.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="input"
-                  style={{ paddingLeft: "2.75rem" }}
-                />
-              </div>
+          <div>
+            <label htmlFor="reg-email" style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: "0.375rem" }}>
+              Email Address
+            </label>
+            <div style={{ position: "relative" }}>
+              <Envelope size={18} weight="regular" color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+              <input
+                id="reg-email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="input"
+                style={{ paddingLeft: "2.75rem" }}
+              />
             </div>
+          </div>
 
+          <button
+            type="button"
+            onClick={nextStep1}
+            className="btn btn-primary btn-full"
+            style={{ height: "48px", marginTop: "0.25rem" }}
+          >
+            Continue <ArrowRight size={16} weight="bold" />
+          </button>
+        </div>
+      )}
+
+      {/* ── STEP 2: Password ─────────────────────────────────────────── */}
+      {step === 2 && (
+        <div className="animate-scale-in" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <div>
+            <label htmlFor="reg-password" style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: "0.375rem" }}>
+              Password
+            </label>
+            <div style={{ position: "relative" }}>
+              <Lock size={18} weight="regular" color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+              <input
+                id="reg-password"
+                type={showPwd ? "text" : "password"}
+                placeholder="At least 8 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="input"
+                style={{ paddingLeft: "2.75rem", paddingRight: "2.75rem" }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPwd((v) => !v)}
+                style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 0 }}
+              >
+                {showPwd ? <EyeSlash size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="reg-confirm-password" style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: "0.375rem" }}>
+              Confirm Password
+            </label>
+            <div style={{ position: "relative" }}>
+              <Lock size={18} weight="regular" color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+              <input
+                id="reg-confirm-password"
+                type={showConfirmPwd ? "text" : "password"}
+                placeholder="Re-enter password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                className="input"
+                style={{ paddingLeft: "2.75rem", paddingRight: "2.75rem" }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPwd((v) => !v)}
+                style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 0 }}
+              >
+                {showConfirmPwd ? <EyeSlash size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.25rem" }}>
             <button
               type="button"
-              onClick={nextStep1}
-              className="btn btn-primary btn-full"
-              style={{ height: "48px", marginTop: "0.5rem", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+              onClick={() => setStep(1)}
+              className="btn btn-secondary"
+              style={{ flex: 1, height: "48px" }}
+            >
+              <ArrowLeft size={16} weight="bold" /> Back
+            </button>
+            <button
+              type="button"
+              onClick={nextStep2}
+              className="btn btn-primary"
+              style={{ flex: 2, height: "48px" }}
             >
               Continue <ArrowRight size={16} weight="bold" />
             </button>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* STEP 2: Password configurations */}
-        {step === 2 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-            <div>
-              <label htmlFor="reg-password" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)", display: "block", marginBottom: "0.5rem" }}>
-                Account Password
-              </label>
-              <div style={{ position: "relative" }}>
-                <Lock size={18} weight="regular" color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                <input
-                  id="reg-password"
-                  type={showPwd ? "text" : "password"}
-                  placeholder="At least 8 characters"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="input"
-                  style={{ paddingLeft: "2.75rem", paddingRight: "2.75rem" }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPwd((v) => !v)}
-                  style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 0 }}
-                >
-                  {showPwd ? <EyeSlash size={18} weight="regular" /> : <Eye size={18} weight="regular" />}
-                </button>
-              </div>
-            </div>
+      {/* ── STEP 3: PIN Keypad ───────────────────────────────────────── */}
+      {step === 3 && (
+        <div className="animate-scale-in" style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <PinKeypad
+            value={pinPhase === "set" ? pin : confirmPin}
+            onChange={handlePinChange}
+          />
 
-            <div>
-              <label htmlFor="reg-confirm-password" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)", display: "block", marginBottom: "0.5rem" }}>
-                Confirm Password
-              </label>
-              <div style={{ position: "relative" }}>
-                <Lock size={18} weight="regular" color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                <input
-                  id="reg-confirm-password"
-                  type={showConfirmPwd ? "text" : "password"}
-                  placeholder="Re-enter password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  className="input"
-                  style={{ paddingLeft: "2.75rem", paddingRight: "2.75rem" }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPwd((v) => !v)}
-                  style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 0 }}
-                >
-                  {showConfirmPwd ? <EyeSlash size={18} weight="regular" /> : <Eye size={18} weight="regular" />}
-                </button>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="btn btn-secondary"
-                style={{ flex: 1, height: "48px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
-              >
-                <ArrowLeft size={16} weight="bold" /> Back
-              </button>
-              <button
-                type="button"
-                onClick={nextStep2}
-                className="btn btn-primary"
-                style={{ flex: 2, height: "48px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
-              >
-                Continue <ArrowRight size={16} weight="bold" />
-              </button>
-            </div>
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem", width: "100%", maxWidth: "280px" }}>
+            <button
+              type="button"
+              onClick={() => {
+                if (pinPhase === "confirm") {
+                  setPinPhase("set");
+                  setPin("");
+                  setConfirmPin("");
+                } else {
+                  setStep(2);
+                }
+              }}
+              className="btn btn-secondary btn-full"
+              style={{ height: "44px", fontSize: "0.8125rem" }}
+              disabled={isPending}
+            >
+              <ArrowLeft size={14} weight="bold" /> Back
+            </button>
           </div>
-        )}
 
-        {/* STEP 3: Transaction PIN setups */}
-        {step === 3 && (
-          <form onSubmit={handleRegisterSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-            <div>
-              <label htmlFor="reg-pin" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)", display: "block", marginBottom: "0.5rem" }}>
-                Choose Transaction PIN
-              </label>
-              <div style={{ position: "relative" }}>
-                <Key size={18} weight="regular" color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                <input
-                  id="reg-pin"
-                  type="password"
-                  inputMode="numeric"
-                  pattern="[0-9]{4}"
-                  maxLength={4}
-                  placeholder="Set 4-Digit Security PIN"
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
-                  required
-                  className="input"
-                  style={{ paddingLeft: "2.75rem", textAlign: "center", fontSize: "1.125rem", letterSpacing: "0.5em" }}
-                />
-              </div>
-            </div>
+          {isPending && (
+            <p style={{ marginTop: "1rem", fontSize: "0.8125rem", color: "var(--text-muted)", textAlign: "center" }}>
+              Creating your account…
+            </p>
+          )}
+        </div>
+      )}
 
-            <div>
-              <label htmlFor="reg-confirm-pin" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)", display: "block", marginBottom: "0.5rem" }}>
-                Confirm Transaction PIN
-              </label>
-              <div style={{ position: "relative" }}>
-                <Key size={18} weight="regular" color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                <input
-                  id="reg-confirm-pin"
-                  type="password"
-                  inputMode="numeric"
-                  pattern="[0-9]{4}"
-                  maxLength={4}
-                  placeholder="Confirm 4-Digit PIN"
-                  value={confirmPin}
-                  onChange={(e) => setConfirmPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
-                  required
-                  className="input"
-                  style={{ paddingLeft: "2.75rem", textAlign: "center", fontSize: "1.125rem", letterSpacing: "0.5em" }}
-                />
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className="btn btn-secondary"
-                style={{ flex: 1, height: "48px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
-                disabled={isPending}
-              >
-                <ArrowLeft size={16} weight="bold" /> Back
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                style={{ flex: 2, height: "48px", display: "flex", alignItems: "center", justifyContent: "center" }}
-                disabled={isPending}
-              >
-                {isPending ? "Creating account…" : "Create Account"}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-
-      <p style={{ textAlign: "left", marginTop: "2.5rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>
+      <p style={{ textAlign: "center", marginTop: "2rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>
         Already have an account?{" "}
-        <Link href="/login" style={{ color: "var(--color-primary)", fontWeight: 700, textDecoration: "none" }}>
+        <Link href="/login" style={{ color: "var(--color-primary)", fontWeight: 600, textDecoration: "none" }}>
           Sign in
         </Link>
       </p>

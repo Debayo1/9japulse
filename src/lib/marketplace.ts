@@ -1,4 +1,4 @@
-import { createServiceClient } from "./supabaseServer";
+﻿import { createServiceClient } from "./supabaseServer";
 import { applyTransaction, getWallet } from "./ledger";
 
 export interface Product {
@@ -74,7 +74,7 @@ const SEED_PRODUCTS: Product[] = [
   {
     id: "prod-5",
     title: "Waterproof Bluetooth Speaker",
-    description: "IPX7-rated portable wireless speaker with 360° rich bass sound for outdoors.",
+    description: "IPX7-rated portable wireless speaker with 360Â° rich bass sound for outdoors.",
     price: 7500.00,
     image_url: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=500",
     category: "Electronics",
@@ -126,7 +126,7 @@ const SEED_PRODUCTS: Product[] = [
   {
     id: "prod-9",
     title: "Portable Rechargeable Fan",
-    description: "USB mini turbo fan with 3 wind speeds and 8-hour battery — perfect for the Nigerian heat.",
+    description: "USB mini turbo fan with 3 wind speeds and 8-hour battery â€” perfect for the Nigerian heat.",
     price: 3800.00,
     image_url: "https://images.unsplash.com/photo-1585338107529-13afc5f02586?w=500",
     category: "Gadgets",
@@ -407,12 +407,13 @@ export async function purchaseMarketplaceItem(
     console.warn("[9jaPulse] Failed to write live marketplace order to DB:", e);
   }
 
-  // 5. Decrement the stock quantity
+  // 5. Atomically decrement stock (only if still in stock)
   try {
     await (supabase as any)
       .from("marketplace_products")
-      .update({ stock_quantity: product.stock_quantity - 1 })
-      .eq("id", productId);
+      .update({ stock_quantity: (product.stock_quantity - 1) })
+      .eq("id", productId)
+      .gte("stock_quantity", 1);
   } catch (e) {
     console.warn("[9jaPulse] Skip stock decrement on database (offline/missing table)");
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Smartphone, World, CloudLightning, Airplay, Book, CoinStack, Certificate, ShoppingBag } from "@duo-icons/react";
@@ -32,12 +32,6 @@ export default function HomePage() {
   const [wallet, setWallet] = useState<{ id: string; balance_total: number; balance_withdrawable: number } | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [fullName, setFullName] = useState("User");
-
-  // Pull to refresh states
-  const [pullDistance, setPullDistance] = useState(0);
-  const [isPulling, setIsPulling] = useState(false);
-  const [touchStart, setTouchStart] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
 
   // Background Sync Callback (can be triggered programmatically or manually)
   const performBackgroundSync = useCallback(async (isManual = false) => {
@@ -99,54 +93,17 @@ export default function HomePage() {
       setSyncMessage(isManual ? "Updated" : "Synced");
       setTimeout(() => {
         setSyncing(false);
-        setRefreshing(false);
-        setPullDistance(0);
       }, 1500);
     } catch (err) {
       console.error("SWR Sync failed:", err);
       setSyncMessage("Sync failed");
       setTimeout(() => {
         setSyncing(false);
-        setRefreshing(false);
-        setPullDistance(0);
       }, 2000);
     } finally {
       setLoading(false);
     }
   }, [router]);
-
-  // Touch handlers for pull to refresh
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (typeof window !== "undefined" && window.scrollY === 0 && !refreshing) {
-      setTouchStart(e.touches[0].clientY);
-      setIsPulling(true);
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isPulling || refreshing) return;
-    const currentY = e.touches[0].clientY;
-    const diff = currentY - touchStart;
-    if (diff > 0) {
-      const distance = Math.min(diff * 0.4, 80);
-      setPullDistance(distance);
-      if (diff > 10 && e.cancelable) {
-        e.preventDefault();
-      }
-    }
-  };
-
-  const handleTouchEnd = () => {
-    if (!isPulling || refreshing) return;
-    setIsPulling(false);
-    if (pullDistance > 55) {
-      setRefreshing(true);
-      setPullDistance(55);
-      performBackgroundSync(true);
-    } else {
-      setPullDistance(0);
-    }
-  };
 
   useEffect(() => {
     // 1. Instantly load values from cache to present dashboard immediately
@@ -154,7 +111,16 @@ export default function HomePage() {
     const cachedTransactions = localStorage.getItem("vtu_transactions_cache");
     const cachedProfile = localStorage.getItem("vtu_profile_cache");
 
-    if (cachedWallet) setWallet(JSON.parse(cachedWallet));
+    if (cachedWallet) {
+      try {
+        const parsed = JSON.parse(cachedWallet);
+        setWallet({
+          id: parsed.id ?? null,
+          balance_total: Number(parsed.balance_total ?? parsed.totalBalance ?? 0),
+          balance_withdrawable: Number(parsed.balance_withdrawable ?? parsed.withdrawable ?? 0),
+        });
+      } catch {}
+    }
     if (cachedTransactions) setTransactions(JSON.parse(cachedTransactions));
     if (cachedProfile) setFullName(JSON.parse(cachedProfile).fullName);
 
@@ -187,8 +153,8 @@ export default function HomePage() {
             const newW = payload.new as any;
             const wObj = {
               id: newW.id,
-              balance_total: Number(newW.balance_total),
-              balance_withdrawable: Number(newW.balance_withdrawable),
+              balance_total: Number(newW.balance_total ?? 0),
+              balance_withdrawable: Number(newW.balance_withdrawable ?? 0),
             };
             setWallet(wObj);
             localStorage.setItem("vtu_wallet_cache", JSON.stringify(wObj));
@@ -218,45 +184,8 @@ export default function HomePage() {
     <div
       className="page"
       style={{ position: "relative", overflowX: "hidden" }}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
     >
-      {/* Pull to Refresh Spinner Indicator */}
-      <div style={{
-        height: `${pullDistance}px`,
-        opacity: pullDistance > 0 ? 1 : 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        transition: isPulling ? "none" : "height var(--duration-fast) var(--ease-smooth), opacity var(--duration-fast) var(--ease-smooth)",
-        overflow: "hidden",
-        backgroundColor: "rgba(15, 23, 42, 0.4)",
-        borderRadius: "0 0 16px 16px",
-        borderBottom: pullDistance > 0 ? "1px solid var(--border)" : "none",
-        gap: "8px",
-        color: "var(--text-secondary)",
-        fontSize: "0.8rem",
-        fontWeight: 600,
-        width: "100%",
-        boxSizing: "border-box"
-      }}>
-        <div className={`spinner-dot ${refreshing ? "rotating" : ""}`} style={{
-          width: 16,
-          height: 16,
-          borderRadius: "50%",
-          border: "2px solid var(--color-primary)",
-          borderTopColor: "transparent",
-          transform: `rotate(${pullDistance * 4}deg)`
-        }} />
-        <span>{refreshing ? "Updating balance..." : pullDistance > 55 ? "Release to refresh" : "Pull to refresh"}</span>
-      </div>
-
-      <div style={{
-        transform: `translateY(${refreshing ? 55 : pullDistance * 0.5}px)`,
-        transition: isPulling ? "none" : "transform var(--duration-fast) var(--ease-smooth)"
-      }}>
-        {/* Premium Floating Sync Status Pill */}
+      {/* Premium Floating Sync Status Pill */}
         {syncing && (
           <div style={{
             display: "flex",
@@ -293,13 +222,19 @@ export default function HomePage() {
         <Header type="dashboard" userName={fullName} />
 
         {/* Wallet Card */}
-        {wallet && (
+        {wallet ? (
           <WalletCard
             walletId={wallet.id}
             balanceTotal={wallet.balance_total}
             balanceWithdrawable={wallet.balance_withdrawable}
             userName={fullName}
           />
+        ) : (
+          <div className="card" style={{ padding: "1.5rem", textAlign: "center" }}>
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem", margin: 0 }}>
+              Connect your wallet to get started
+            </p>
+          </div>
         )}
 
         {/* Recent Transactions (Brought up under balance card) */}
@@ -379,8 +314,6 @@ export default function HomePage() {
         {/* Promo Wealth Banner */}
         <PromoBanner />
 
-      </div>
-
       <style>{`
         .service-shortcut {
           display: flex;
@@ -408,12 +341,6 @@ export default function HomePage() {
         }
         .pulse-dot {
           animation: pulse 1.2s infinite ease-in-out;
-        }
-        @keyframes rotate {
-          100% { transform: rotate(360deg); }
-        }
-        .rotating {
-          animation: rotate 0.8s linear infinite !important;
         }
       `}</style>
 

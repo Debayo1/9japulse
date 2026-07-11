@@ -1,10 +1,51 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabaseServer";
 import { applyTransaction } from "@/lib/ledger";
+import { getProviderKey } from "@/lib/providerKeys";
+
+const HMAC_ALGORITHM = "sha256";
+
+async function verifySignature(payload: string, signature: string): Promise<boolean> {
+  try {
+    const secret = await getProviderKey("ncwallet", "webhook_secret");
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw", encoder.encode(secret),
+      { name: "HMAC", hash: HMAC_ALGORITHM },
+      false, ["verify"]
+    );
+    const sigBytes = hexToBytes(signature);
+    const dataBytes = encoder.encode(payload);
+    return await crypto.subtle.verify("HMAC", key, sigBytes as BufferSource, dataBytes);
+  } catch {
+    return false;
+  }
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+  }
+  return bytes;
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const data = await req.json();
+    // Verify HMAC signature
+    const signature = req.headers.get("x-ncwallet-signature") || "";
+    const rawBody = await req.text();
+    if (signature) {
+      const isValid = await verifySignature(rawBody, signature);
+      if (!isValid) {
+        console.warn("[9jaPulse Webhook] Invalid HMAC signature");
+        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      }
+    } else {
+      console.warn("[9jaPulse Webhook] Missing HMAC signature header");
+    }
+
+    const data = JSON.parse(rawBody);
 
     // 1. Required fields validation
     const status = data.status;
@@ -33,8 +74,8 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (profErr || !profile) {
-      console.warn(`[9jaPulse Webhook] Profile not found for email: ${email}`);
-      return NextResponse.json({ error: `User with email ${email} not found` }, { status: 404 });
+      console.warn("[9jaPulse Webhook] Profile not found for email:", email);
+      return NextResponse.json({ error: "User with email " + email + " not found" }, { status: 404 });
     }
 
     // 3. Fetch user wallet
@@ -45,7 +86,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (wallErr || !wallet) {
-      console.error(`[9jaPulse Webhook] Wallet not found for user: ${profile.id}`);
+      console.error("[9jaPulse Webhook] Wallet not found for user:", profile.id);
       return NextResponse.json({ error: "Wallet not found" }, { status: 404 });
     }
 
@@ -58,7 +99,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (existingTxn) {
-      console.info(`[9jaPulse Webhook] Transaction ${refId} already processed.`);
+      console.info("[9jaPulse Webhook] Transaction " + refId + " already processed.");
       return NextResponse.json({ message: "Transaction already processed" }, { status: 200 });
     }
 
@@ -75,7 +116,7 @@ export async function POST(req: NextRequest) {
     await applyTransaction(wallet.id, {
       service_type: "deposit",
       amount: netAmount,
-      description: `Wallet funding via bank transfer (${bankName || "Bank"})`,
+      description: "Wallet funding via bank transfer (" + (bankName || "Bank") + ")",
       status: "success",
       reference: refId,
       meta: {
@@ -85,7 +126,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    console.info(`[9jaPulse Webhook] Funded ${email} with ₦${netAmount} (fee: ₦${fee}) | Ref: ${refId}`);
+    console.info("[9jaPulse Webhook] Funded " + email + " with N" + netAmount + " (fee: N" + fee + ") | Ref: " + refId);
     return NextResponse.json({ status: "ok", message: "Deposit processed successfully" });
   } catch (err: any) {
     console.error("[9jaPulse Webhook] Crash processing callback:", err);

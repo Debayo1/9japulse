@@ -8,7 +8,7 @@ type Transaction   = Database["public"]["Tables"]["transactions"]["Insert"];
 type Wallet        = Database["public"]["Tables"]["wallets"]["Row"];
 type WalletUpdate  = Database["public"]["Tables"]["wallets"]["Update"];
 
-// ─── Credit / Debit decision ─────────────────────────────────────────────────
+// ---
 const CREDIT_SERVICE_TYPES = new Set([
   "wallet_funding", "cashback", "referral_bonus", "contest_payout",
   "refund", "deposit", "reward",
@@ -18,7 +18,7 @@ const HELD_SERVICE_TYPES = new Set([
   "cashback", "referral_bonus", "contest_payout", "reward",
 ]);
 
-// ─── Apply a transaction atomically (uses SELECT ... FOR UPDATE) ────────────
+// ---
 export async function applyTransaction(
   walletId: string,
   txn: {
@@ -63,46 +63,31 @@ export async function applyTransaction(
   };
 }
 
-// ─── Move funds (user-initiated only – no automatic cron) ────────────────────
+// ---
 export async function moveFunds(
   walletId: string,
   amount: number,
   toWithdrawable: boolean
 ) {
-  const { data: wallet, error: walletError } = await (supabase as any)
-    .from("wallets")
-    .select("balance_total, balance_withdrawable")
-    .eq("id", walletId)
-    .single() as { data: Pick<Wallet, "balance_total" | "balance_withdrawable"> | null; error: any };
+  // Use atomic RPC with FOR UPDATE lock to prevent race conditions
+  const { data, error } = await (supabase as any).rpc("move_funds_safe", {
+    p_wallet_id: walletId,
+    p_amount: amount,
+    p_to_withdrawable: toWithdrawable,
+  });
 
-  if (walletError || !wallet) throw new Error(walletError?.message ?? "Wallet not found");
-
-  let { balance_total: newTotal, balance_withdrawable: newWithdrawable } = wallet;
-
-  if (toWithdrawable) {
-    const held = newTotal - newWithdrawable;
-    if (amount > held) throw new Error("Insufficient held funds to move");
-    newWithdrawable += amount;
-  } else {
-    if (amount > newWithdrawable) throw new Error("Insufficient withdrawable funds");
-    newWithdrawable -= amount;
+  if (error) {
+    throw new Error(error.message ?? "Failed to move funds");
   }
 
-  const payload: WalletUpdate = {
-    balance_withdrawable: newWithdrawable,
+  const result = typeof data === "string" ? JSON.parse(data) : data;
+  return {
+    balance_total: Number(result.balance_total),
+    balance_withdrawable: Number(result.balance_withdrawable),
   };
-
-  const { error: updateError } = await (supabase as any)
-    .from("wallets")
-    .update(payload)
-    .eq("id", walletId);
-
-  if (updateError) throw new Error(updateError.message);
-
-  return { balance_total: newTotal, balance_withdrawable: newWithdrawable };
 }
 
-// ─── Get wallet for user (with automatic database self-healing) ──────────────
+// ---
 export async function getWallet(userId: string): Promise<Wallet> {
   // Use the stored procedure for idempotent profile+wallet creation
   try {
@@ -144,7 +129,7 @@ export async function getWallet(userId: string): Promise<Wallet> {
   return data;
 }
 
-// ─── Get paginated transactions ───────────────────────────────────────────────
+// ---
 export async function getTransactions(walletId: string, page = 0, limit = 20) {
   const from = page * limit;
   const to   = from + limit - 1;

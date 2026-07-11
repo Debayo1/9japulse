@@ -48,20 +48,17 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", justifyContent: "center", padding: "2.5rem 1.5rem", maxWidth: 420, margin: "0 auto" }}>
-      {/* Logo / Brand */}
-      <div style={{ textAlign: "left", marginBottom: "2.5rem" }}>
-        <div style={{ width: 56, height: 56, borderRadius: 16, background: "linear-gradient(135deg, var(--color-primary), var(--color-accent))", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 0 1.25rem 0", fontSize: "1.5rem", fontWeight: 900, color: "white", boxShadow: "var(--shadow-glow)" }}>
-          ₦
-        </div>
-        <h1 style={{ fontSize: "1.875rem", fontWeight: 800, letterSpacing: "-0.03em", margin: 0 }}>Welcome Back</h1>
-        <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem", marginTop: "0.375rem" }}>Sign in to continue to 9jaPulse</p>
+    <div className="auth-page">
+      {/* Heading */}
+      <div className="auth-heading">
+        <h1>Welcome back</h1>
+        <p>Sign in to your 9jaPulse account</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="animate-slide-up" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+      <form onSubmit={handleSubmit} className="animate-scale-in" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
         {/* Email */}
         <div>
-          <label htmlFor="login-email" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)", display: "block", marginBottom: "0.5rem" }}>
+          <label htmlFor="login-email" style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: "0.375rem" }}>
             Email Address
           </label>
           <div style={{ position: "relative" }}>
@@ -70,7 +67,7 @@ export default function LoginPage() {
               id="login-email"
               name="email"
               type="email"
-              placeholder="e.g. user@gmail.com"
+              placeholder="you@example.com"
               required
               autoComplete="email"
               className="input"
@@ -81,12 +78,12 @@ export default function LoginPage() {
 
         {/* Password */}
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.5rem" }}>
-            <label htmlFor="login-password" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.375rem" }}>
+            <label htmlFor="login-password" style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-secondary)" }}>
               Password
             </label>
             <Link href="/reset-password" style={{ fontSize: "0.75rem", color: "var(--color-primary)", textDecoration: "none", fontWeight: 600 }}>
-              Forgot password?
+              Forgot?
             </Link>
           </div>
           <div style={{ position: "relative" }}>
@@ -112,14 +109,14 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <button id="login-submit-btn" type="submit" className="btn btn-primary btn-full" style={{ height: "48px", marginTop: "0.5rem" }} disabled={isPending}>
+        <button id="login-submit-btn" type="submit" className="btn btn-primary btn-full" style={{ height: "48px", marginTop: "0.25rem" }} disabled={isPending}>
           {isPending ? "Signing in…" : "Sign In"}
         </button>
       </form>
 
-      <p style={{ textAlign: "left", marginTop: "2rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>
+      <p style={{ textAlign: "center", marginTop: "2rem", color: "var(--text-secondary)", fontSize: "0.875rem" }}>
         Don&apos;t have an account?{" "}
-        <Link href="/register" style={{ color: "var(--color-primary)", fontWeight: 700, textDecoration: "none" }}>
+        <Link href="/register" style={{ color: "var(--color-primary)", fontWeight: 600, textDecoration: "none" }}>
           Create one
         </Link>
       </p>

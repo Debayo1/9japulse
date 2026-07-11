@@ -248,6 +248,13 @@ export default function HistoryClient({ initialTransactions, totalCount, walletI
           </p>
 
           <HistoryList transactions={filteredTransactions} walletId={walletId} />
+          {filteredTransactions.length === 0 && (
+            <div className="card" style={{ padding: "2rem 1.5rem", textAlign: "center" }}>
+              <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem", margin: 0 }}>
+                No transactions yet
+              </p>
+            </div>
+          )}
         </>
       ) : (
         renderInsights()

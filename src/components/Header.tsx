@@ -173,16 +173,6 @@ export default function Header({
                 aria-label="Notifications"
               >
                 <Bell size={18} />
-                <span style={{
-                  position: "absolute",
-                  top: "7px",
-                  right: "7px",
-                  width: "7px",
-                  height: "7px",
-                  borderRadius: "50%",
-                  backgroundColor: "var(--color-danger)",
-                  border: "1.5px solid var(--bg-base)",
-                }} />
               </button>
             </div>
           </>

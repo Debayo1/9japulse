@@ -1,6 +1,12 @@
-"use client";
+﻿"use client";
 
-import type { ReactNode } from "react";
+import type { ReactNode, ComponentType } from "react";
+import {
+  Home, Star, Clock, CreditCard, User, ArrowUp, ArrowDown, Menu, Settings,
+} from "lucide-react";
+import dynamic from "next/dynamic";
+
+const Lottie = dynamic(() => import("lottie-react").then(mod => mod.default), { ssr: false });
 
 export type IconName =
   | "home"
@@ -13,26 +19,26 @@ export type IconName =
   | "menu"
   | "settings";
 
+const LUCIDE_ICONS: Record<string, ComponentType<{ size?: number; className?: string }>> = {
+  home: Home,
+  star: Star,
+  clock: Clock,
+  "credit-card": CreditCard,
+  user: User,
+  "arrow-up": ArrowUp,
+  "arrow-down": ArrowDown,
+  menu: Menu,
+  settings: Settings,
+};
+
 interface IconProps {
-  /** "lucide" for static SVG icons, "lottie" for animated ones */
   type: "lucide" | "lottie";
-  /** Name of the Lucide icon (required when type="lucide") */
   name?: string;
-  /** Lottie animation JSON object (required when type="lottie") */
   animationData?: object;
-  /** Desired size in pixels */
   size?: number;
-  /** Additional CSS classes */
   className?: string;
 }
 
-/**
- * Unified Icon component.
- * - For static UI use the lightweight Lucide icons.
- * - For high-impact actions import a Lottie JSON and pass it via `animationData`.
- *
- * Lottie is dynamically imported to keep SSR bundle lean.
- */
 export const Icon = ({
   type,
   name,
@@ -42,16 +48,12 @@ export const Icon = ({
 }: IconProps): ReactNode => {
   if (type === "lucide") {
     if (!name) throw new Error("`name` is required for lucide icons");
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const LucideComponent = (require("lucide-react") as Record<string, React.ComponentType<{ size: number; className: string }>>)[name];
+    const LucideComponent = LUCIDE_ICONS[name];
+    if (!LucideComponent) throw new Error("Unknown icon: " + name);
     return <LucideComponent size={size} className={className} />;
   }
 
-  // Lottie — dynamically imported by consumers via next/dynamic
   if (!animationData) throw new Error("`animationData` is required for lottie icons");
-
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Lottie = require("lottie-react").default as React.ComponentType<{ animationData: object; style: object; className: string; loop: boolean }>;
   return (
     <Lottie
       animationData={animationData}

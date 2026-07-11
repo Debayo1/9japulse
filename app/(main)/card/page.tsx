@@ -1,8 +1,9 @@
-import { CreditCard, Plus, ArrowUpRight, ShieldCheck, CaretRight } from "@phosphor-icons/react/dist/ssr";
+import { CreditCard, ShieldCheck, CaretRight } from "@phosphor-icons/react/dist/ssr";
 import { getUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { SkeletonList } from "@/components/SkeletonLoader";
+import CardActions from "./CardActions";
 
 async function CardContent() {
   const user = await getUser();
@@ -50,16 +51,7 @@ async function CardContent() {
       </div>
 
       {/* Actions */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.5rem" }}>
-        <button className="btn btn-primary" style={{ flexDirection: "column", gap: "0.5rem", height: 72 }}>
-          <Plus size={20} weight="bold" />
-          <span style={{ fontSize: "0.8125rem" }}>Request Card</span>
-        </button>
-        <button className="btn btn-secondary" style={{ flexDirection: "column", gap: "0.5rem", height: 72 }}>
-          <ArrowUpRight size={20} weight="regular" />
-          <span style={{ fontSize: "0.8125rem" }}>Fund Card</span>
-        </button>
-      </div>
+      <CardActions />
 
       {/* Info items */}
       {[

@@ -12,7 +12,7 @@ export default function LandingPage() {
       minHeight: "100dvh",
       backgroundColor: "var(--bg-base)",
       color: "var(--text-primary)",
-      fontFamily: "var(--font-outfit), sans-serif",
+      fontFamily: "var(--font-poppins), sans-serif",
       display: "flex",
       flexDirection: "column"
     }}>

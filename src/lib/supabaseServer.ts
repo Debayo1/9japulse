@@ -1,7 +1,19 @@
-import { createClient } from "@supabase/supabase-js";
+﻿import { createClient } from "@supabase/supabase-js";
 import { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import type { Database } from "./database.types";
+
+const REQUIRED_ENV_VARS = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"] as const;
+
+function validateSupabaseEnv(): void {
+  for (const key of REQUIRED_ENV_VARS) {
+    if (!process.env[key]) {
+      throw new Error("[supabaseServer] Missing required environment variable: " + key);
+    }
+  }
+}
+
+validateSupabaseEnv();
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
@@ -13,7 +25,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? supabaseAnon
  *   1. Cookie "sb-<ref>-auth-token" (set by @supabase/ssr or supabase-js v2)
  *   2. Authorization: Bearer <token> header (useful for API clients)
  *
- * Returns { supabase: client, user } — user is null if not authenticated.
+ * Returns { supabase: client, user } â€” user is null if not authenticated.
  */
 export async function createRequestClient(req: NextRequest) {
   let accessToken: string | null = null;
@@ -66,7 +78,7 @@ export async function createRequestClient(req: NextRequest) {
 }
 
 /**
- * Service-role client — bypasses RLS, use only for trusted server operations.
+ * Service-role client â€” bypasses RLS, use only for trusted server operations.
  */
 export function createServiceClient() {
   return createClient<Database>(supabaseUrl, supabaseServiceKey, {

@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, Key, Fingerprint } from "@phosphor-icons/react";
+import { ShieldCheck, Key, Fingerprint, Eye, EyeClosed, CheckCircle, XCircle } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import Header from "@/components/Header";
 import { updateTransactionPin, updateAppPasscode } from "@/lib/auth";
@@ -11,31 +11,28 @@ import { supabaseBrowser } from "@/lib/supabaseBrowser";
 export default function SecurityPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  
+
   const [hasPin, setHasPin] = useState(false);
   const [hasPasscode, setHasPasscode] = useState(false);
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
-  
-  // PIN states
+
   const [currentPin, setCurrentPin] = useState("");
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
+  const [showPins, setShowPins] = useState(false);
 
-  // Passcode states
   const [currentPasscode, setCurrentPasscode] = useState("");
   const [newPasscode, setNewPasscode] = useState("");
   const [confirmPasscode, setConfirmPasscode] = useState("");
+  const [showPasscodes, setShowPasscodes] = useState(false);
 
   useEffect(() => {
     async function checkSecurityStatus() {
       try {
         const { data: sessionData } = await supabaseBrowser.auth.getSession();
         const user = sessionData?.session?.user;
-        if (!user) {
-          router.push("/login");
-          return;
-        }
+        if (!user) { router.push("/login"); return; }
 
         const { data: profile } = await (supabaseBrowser
           .from("profiles")
@@ -64,39 +61,20 @@ export default function SecurityPage() {
 
   const handlePinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (hasPin && currentPin.length !== 4) {
-      toast.error("Please enter your current 4-digit PIN");
-      return;
-    }
-    if (newPin.length !== 4) {
-      toast.error("New PIN must be exactly 4 digits");
-      return;
-    }
-    if (newPin !== confirmPin) {
-      toast.error("New PINs do not match");
-      return;
-    }
+    if (hasPin && currentPin.length !== 4) { toast.error("Enter your current 4-digit PIN"); return; }
+    if (newPin.length !== 4) { toast.error("New PIN must be exactly 4 digits"); return; }
+    if (newPin !== confirmPin) { toast.error("PINs do not match"); return; }
 
     startTransition(async () => {
       try {
         const { data: sessionData } = await supabaseBrowser.auth.getSession();
         const session = sessionData?.session;
-        if (!session?.access_token || !session.refresh_token) {
-          throw new Error("Auth session missing");
-        }
+        if (!session?.access_token || !session.refresh_token) throw new Error("Auth session missing");
 
-        await updateTransactionPin(
-          hasPin ? currentPin : null,
-          newPin,
-          session.access_token,
-          session.refresh_token
-        );
-        toast.success(hasPin ? "Transaction PIN updated successfully!" : "Transaction PIN set successfully!");
+        await updateTransactionPin(hasPin ? currentPin : null, newPin, session.access_token, session.refresh_token);
+        toast.success(hasPin ? "PIN updated successfully!" : "PIN set successfully!");
         setHasPin(true);
-        setCurrentPin("");
-        setNewPin("");
-        setConfirmPin("");
+        setCurrentPin(""); setNewPin(""); setConfirmPin("");
       } catch (err: unknown) {
         toast.error(err instanceof Error ? err.message : "Failed to update PIN");
       }
@@ -105,39 +83,20 @@ export default function SecurityPage() {
 
   const handlePasscodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (hasPasscode && currentPasscode.length !== 4) {
-      toast.error("Please enter your current 4-digit passcode");
-      return;
-    }
-    if (newPasscode.length !== 4) {
-      toast.error("New passcode must be exactly 4 digits");
-      return;
-    }
-    if (newPasscode !== confirmPasscode) {
-      toast.error("New passcodes do not match");
-      return;
-    }
+    if (hasPasscode && currentPasscode.length !== 4) { toast.error("Enter your current 4-digit passcode"); return; }
+    if (newPasscode.length !== 4) { toast.error("New passcode must be exactly 4 digits"); return; }
+    if (newPasscode !== confirmPasscode) { toast.error("Passcodes do not match"); return; }
 
     startTransition(async () => {
       try {
         const { data: sessionData } = await supabaseBrowser.auth.getSession();
         const session = sessionData?.session;
-        if (!session?.access_token || !session.refresh_token) {
-          throw new Error("Auth session missing");
-        }
+        if (!session?.access_token || !session.refresh_token) throw new Error("Auth session missing");
 
-        await updateAppPasscode(
-          hasPasscode ? currentPasscode : null,
-          newPasscode,
-          session.access_token,
-          session.refresh_token
-        );
-        toast.success(hasPasscode ? "App passcode updated successfully!" : "App passcode set successfully!");
+        await updateAppPasscode(hasPasscode ? currentPasscode : null, newPasscode, session.access_token, session.refresh_token);
+        toast.success(hasPasscode ? "Passcode updated!" : "Passcode set!");
         setHasPasscode(true);
-        setCurrentPasscode("");
-        setNewPasscode("");
-        setConfirmPasscode("");
+        setCurrentPasscode(""); setNewPasscode(""); setConfirmPasscode("");
       } catch (err: unknown) {
         toast.error(err instanceof Error ? err.message : "Failed to update passcode");
       }
@@ -151,23 +110,22 @@ export default function SecurityPage() {
       if (!user) return;
 
       if (!hasPasscode) {
-        toast.error("Please set a 4-digit app passcode before enabling biometrics");
+        toast.error("Set an app passcode first");
         return;
       }
 
       if (biometricsEnabled) {
         localStorage.removeItem(`biometrics_enabled_${user.id}`);
         setBiometricsEnabled(false);
-        toast.success("Biometric login disabled for this device");
+        toast.success("Biometrics disabled");
       } else {
         if (typeof window !== "undefined" && !window.PublicKeyCredential) {
           toast.error("Biometrics is not supported on this browser or device");
           return;
         }
-
         localStorage.setItem(`biometrics_enabled_${user.id}`, "true");
         setBiometricsEnabled(true);
-        toast.success("Device biometrics connected successfully!");
+        toast.success("Biometrics enabled");
       }
     } catch {
       toast.error("Failed to configure biometrics");
@@ -182,18 +140,69 @@ export default function SecurityPage() {
     );
   }
 
+  const statusItems = [
+    { label: "Transaction PIN", active: hasPin },
+    { label: "App Passcode", active: hasPasscode },
+    { label: "Biometrics", active: biometricsEnabled },
+  ];
+
   return (
     <div className="page">
       <Header title="Security & Privacy" />
 
-      {/* ─── TRANSACTION PIN SECTION ─── */}
-      <div className="card" style={{ padding: "1.25rem", marginBottom: "1.5rem" }}>
-        <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", marginBottom: "1.25rem" }}>
-          <ShieldCheck size={24} weight="duotone" style={{ color: "var(--color-primary)", flexShrink: 0, marginTop: "2px" }} />
-          <div>
-            <h2 style={{ fontSize: "0.875rem", fontWeight: 700, margin: 0 }}>Transaction Security PIN</h2>
-            <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "4px", lineHeight: 1.4 }}>
-              Your transaction PIN protects your funds. You will need to enter this 4-digit security code for every purchase, transfer, or withdrawal.
+      {/* ─── Security Status Summary ─── */}
+      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
+        {statusItems.map((item) => (
+          <div
+            key={item.label}
+            className="animate-fade-in"
+            style={{
+              flex: 1,
+              background: item.active
+                ? "linear-gradient(135deg, hsl(152 60% 42% / 0.1), hsl(152 60% 42% / 0.02))"
+                : "var(--bg-surface)",
+              border: "1.5px solid",
+              borderColor: item.active ? "hsl(152 60% 42% / 0.2)" : "var(--border)",
+              borderRadius: "14px",
+              padding: "0.75rem 0.625rem",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "0.375rem",
+              textAlign: "center",
+            }}
+          >
+            {item.active
+              ? <CheckCircle size={20} weight="fill" style={{ color: "var(--color-success)" }} />
+              : <XCircle size={20} weight="fill" style={{ color: "var(--text-muted)", opacity: 0.5 }} />
+            }
+            <div>
+              <p style={{ fontSize: "0.5625rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", margin: 0 }}>
+                {item.label}
+              </p>
+              <p style={{ fontSize: "0.6875rem", fontWeight: 700, color: item.active ? "var(--color-success)" : "var(--text-secondary)", margin: "2px 0 0 0" }}>
+                {item.active ? "Active" : "Not set"}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ─── TRANSACTION PIN ─── */}
+      <div className="card" style={{ padding: "1.25rem", marginBottom: "1rem" }}>
+        <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", marginBottom: "1rem" }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+            background: "linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#fff", boxShadow: "0 4px 12px hsl(227 70% 55% / 0.2)",
+          }}>
+            <ShieldCheck size={20} weight="duotone" />
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <h2 style={{ fontSize: "0.875rem", fontWeight: 700, margin: 0 }}>Transaction PIN</h2>
+            <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "4px", lineHeight: 1.5 }}>
+              Required for every purchase, transfer, or withdrawal.
             </p>
           </div>
         </div>
@@ -201,80 +210,88 @@ export default function SecurityPage() {
         <form onSubmit={handlePinSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           {hasPin && (
             <div>
-              <label htmlFor="current-pin" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)", display: "block", marginBottom: "0.375rem" }}>
-                Current Transaction PIN
-              </label>
-              <input
-                id="current-pin"
-                type="password"
-                inputMode="numeric"
-                pattern="[0-9]{4}"
-                maxLength={4}
-                placeholder="••••"
-                value={currentPin}
-                onChange={(e) => handleNumericChange(e.target.value, setCurrentPin)}
-                className="input"
-                style={{ textAlign: "center", fontSize: "1.25rem", letterSpacing: "0.5em" }}
-                required
-                autoComplete="off"
-              />
+              <label htmlFor="current-pin" className="input-label">Current PIN</label>
+              <div className="input-wrapper">
+                <input
+                  id="current-pin" type={showPins ? "text" : "password"}
+                  inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
+                  placeholder="••••" value={currentPin}
+                  onChange={(e) => handleNumericChange(e.target.value, setCurrentPin)}
+                  className="input" autoComplete="off" required
+                  style={{ textAlign: "center", fontSize: "1.25rem", letterSpacing: "0.5em", paddingRight: "2.75rem" }}
+                />
+                <button type="button" onClick={() => setShowPins(!showPins)} tabIndex={-1}
+                  aria-label={showPins ? "Hide PIN" : "Show PIN"}
+                  style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", padding: "4px" }}
+                >
+                  {showPins ? <EyeClosed size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
           )}
 
           <div>
-            <label htmlFor="new-pin" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)", display: "block", marginBottom: "0.375rem" }}>
-              {hasPin ? "New Transaction PIN" : "Choose 4-Digit PIN"}
-            </label>
-            <input
-              id="new-pin"
-              type="password"
-              inputMode="numeric"
-              pattern="[0-9]{4}"
-              maxLength={4}
-              placeholder="••••"
-              value={newPin}
-              onChange={(e) => handleNumericChange(e.target.value, setNewPin)}
-              className="input"
-              style={{ textAlign: "center", fontSize: "1.25rem", letterSpacing: "0.5em" }}
-              required
-              autoComplete="off"
-            />
+            <label htmlFor="new-pin" className="input-label">{hasPin ? "New PIN" : "Choose 4-Digit PIN"}</label>
+            <div className="input-wrapper">
+              <input
+                id="new-pin" type={showPins ? "text" : "password"}
+                inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
+                placeholder="••••" value={newPin}
+                onChange={(e) => handleNumericChange(e.target.value, setNewPin)}
+                className="input" autoComplete="off" required
+                style={{ textAlign: "center", fontSize: "1.25rem", letterSpacing: "0.5em", paddingRight: "2.75rem" }}
+              />
+              <button type="button" onClick={() => setShowPins(!showPins)} tabIndex={-1}
+                aria-label={showPins ? "Hide PIN" : "Show PIN"}
+                style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", padding: "4px" }}
+              >
+                {showPins ? <EyeClosed size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <div>
-            <label htmlFor="confirm-pin" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)", display: "block", marginBottom: "0.375rem" }}>
-              Confirm New PIN
-            </label>
-            <input
-              id="confirm-pin"
-              type="password"
-              inputMode="numeric"
-              pattern="[0-9]{4}"
-              maxLength={4}
-              placeholder="••••"
-              value={confirmPin}
-              onChange={(e) => handleNumericChange(e.target.value, setConfirmPin)}
-              className="input"
-              style={{ textAlign: "center", fontSize: "1.25rem", letterSpacing: "0.5em" }}
-              required
-              autoComplete="off"
-            />
+            <label htmlFor="confirm-pin" className="input-label">Confirm New PIN</label>
+            <div className="input-wrapper">
+              <input
+                id="confirm-pin" type={showPins ? "text" : "password"}
+                inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
+                placeholder="••••" value={confirmPin}
+                onChange={(e) => handleNumericChange(e.target.value, setConfirmPin)}
+                className="input" autoComplete="off" required
+                style={{ textAlign: "center", fontSize: "1.25rem", letterSpacing: "0.5em", paddingRight: "2.75rem" }}
+              />
+              <button type="button" onClick={() => setShowPins(!showPins)} tabIndex={-1}
+                aria-label={showPins ? "Hide PIN" : "Show PIN"}
+                style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", padding: "4px" }}
+              >
+                {showPins ? <EyeClosed size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ height: "42px", marginTop: "0.5rem" }} disabled={isPending}>
-            {isPending ? "Updating PIN…" : hasPin ? "Change Security PIN" : "Set Security PIN"}
+          <button type="submit" className="btn btn-primary btn-full" style={{ height: "46px", marginTop: "0.25rem" }} disabled={isPending}>
+            {isPending && <span className="spinner" />}
+            {isPending ? "Updating…" : hasPin ? "Change Transaction PIN" : "Set Transaction PIN"}
           </button>
         </form>
       </div>
 
-      {/* ─── APP LOCK PASSCODE SECTION ─── */}
-      <div className="card" style={{ padding: "1.25rem", marginBottom: "1.5rem" }}>
-        <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", marginBottom: "1.25rem" }}>
-          <Key size={24} weight="duotone" style={{ color: "var(--color-accent)", flexShrink: 0, marginTop: "2px" }} />
-          <div>
+      {/* ─── APP LOCK PASSCODE ─── */}
+      <div className="card" style={{ padding: "1.25rem", marginBottom: "1rem" }}>
+        <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", marginBottom: "1rem" }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+            background: "linear-gradient(135deg, var(--color-accent), hsl(14 88% 50%))",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#fff", boxShadow: "0 4px 12px hsl(14 88% 58% / 0.2)",
+          }}>
+            <Key size={20} weight="duotone" />
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <h2 style={{ fontSize: "0.875rem", fontWeight: 700, margin: 0 }}>App Lock Passcode</h2>
-            <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "4px", lineHeight: 1.4 }}>
-              Set a 4-digit passcode to lock the application. When enabled, you can quickly unlock your dashboard with the passcode instead of entering your email and password every time.
+            <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "4px", lineHeight: 1.5 }}>
+              Quick unlock instead of email &amp; password every time.
             </p>
           </div>
         </div>
@@ -282,110 +299,135 @@ export default function SecurityPage() {
         <form onSubmit={handlePasscodeSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           {hasPasscode && (
             <div>
-              <label htmlFor="current-passcode" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)", display: "block", marginBottom: "0.375rem" }}>
-                Current Passcode
-              </label>
-              <input
-                id="current-passcode"
-                type="password"
-                inputMode="numeric"
-                pattern="[0-9]{4}"
-                maxLength={4}
-                placeholder="••••"
-                value={currentPasscode}
-                onChange={(e) => handleNumericChange(e.target.value, setCurrentPasscode)}
-                className="input"
-                style={{ textAlign: "center", fontSize: "1.25rem", letterSpacing: "0.5em" }}
-                required
-                autoComplete="off"
-              />
+              <label htmlFor="current-passcode" className="input-label">Current Passcode</label>
+              <div className="input-wrapper">
+                <input
+                  id="current-passcode" type={showPasscodes ? "text" : "password"}
+                  inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
+                  placeholder="••••" value={currentPasscode}
+                  onChange={(e) => handleNumericChange(e.target.value, setCurrentPasscode)}
+                  className="input" autoComplete="off" required
+                  style={{ textAlign: "center", fontSize: "1.25rem", letterSpacing: "0.5em", paddingRight: "2.75rem" }}
+                />
+                <button type="button" onClick={() => setShowPasscodes(!showPasscodes)} tabIndex={-1}
+                  aria-label={showPasscodes ? "Hide passcode" : "Show passcode"}
+                  style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", padding: "4px" }}
+                >
+                  {showPasscodes ? <EyeClosed size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
           )}
 
           <div>
-            <label htmlFor="new-passcode" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)", display: "block", marginBottom: "0.375rem" }}>
-              {hasPasscode ? "New Passcode" : "Choose 4-Digit Passcode"}
-            </label>
-            <input
-              id="new-passcode"
-              type="password"
-              inputMode="numeric"
-              pattern="[0-9]{4}"
-              maxLength={4}
-              placeholder="••••"
-              value={newPasscode}
-              onChange={(e) => handleNumericChange(e.target.value, setNewPasscode)}
-              className="input"
-              style={{ textAlign: "center", fontSize: "1.25rem", letterSpacing: "0.5em" }}
-              required
-              autoComplete="off"
-            />
+            <label htmlFor="new-passcode" className="input-label">{hasPasscode ? "New Passcode" : "Choose 4-Digit Passcode"}</label>
+            <div className="input-wrapper">
+              <input
+                id="new-passcode" type={showPasscodes ? "text" : "password"}
+                inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
+                placeholder="••••" value={newPasscode}
+                onChange={(e) => handleNumericChange(e.target.value, setNewPasscode)}
+                className="input" autoComplete="off" required
+                style={{ textAlign: "center", fontSize: "1.25rem", letterSpacing: "0.5em", paddingRight: "2.75rem" }}
+              />
+              <button type="button" onClick={() => setShowPasscodes(!showPasscodes)} tabIndex={-1}
+                aria-label={showPasscodes ? "Hide passcode" : "Show passcode"}
+                style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", padding: "4px" }}
+              >
+                {showPasscodes ? <EyeClosed size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <div>
-            <label htmlFor="confirm-passcode" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-secondary)", display: "block", marginBottom: "0.375rem" }}>
-              Confirm New Passcode
-            </label>
-            <input
-              id="confirm-passcode"
-              type="password"
-              inputMode="numeric"
-              pattern="[0-9]{4}"
-              maxLength={4}
-              placeholder="••••"
-              value={confirmPasscode}
-              onChange={(e) => handleNumericChange(e.target.value, setConfirmPasscode)}
-              className="input"
-              style={{ textAlign: "center", fontSize: "1.25rem", letterSpacing: "0.5em" }}
-              required
-              autoComplete="off"
-            />
+            <label htmlFor="confirm-passcode" className="input-label">Confirm New Passcode</label>
+            <div className="input-wrapper">
+              <input
+                id="confirm-passcode" type={showPasscodes ? "text" : "password"}
+                inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
+                placeholder="••••" value={confirmPasscode}
+                onChange={(e) => handleNumericChange(e.target.value, setConfirmPasscode)}
+                className="input" autoComplete="off" required
+                style={{ textAlign: "center", fontSize: "1.25rem", letterSpacing: "0.5em", paddingRight: "2.75rem" }}
+              />
+              <button type="button" onClick={() => setShowPasscodes(!showPasscodes)} tabIndex={-1}
+                aria-label={showPasscodes ? "Hide passcode" : "Show passcode"}
+                style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", padding: "4px" }}
+              >
+                {showPasscodes ? <EyeClosed size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
-          <button type="submit" className="btn btn-secondary" style={{ height: "42px", marginTop: "0.5rem" }} disabled={isPending}>
-            {isPending ? "Updating Passcode…" : hasPasscode ? "Change App Passcode" : "Set App Passcode"}
+          <button type="submit" className="btn btn-secondary btn-full" style={{ height: "46px", marginTop: "0.25rem" }} disabled={isPending}>
+            {isPending && <span className="spinner" />}
+            {isPending ? "Updating…" : hasPasscode ? "Change App Passcode" : "Set App Passcode"}
           </button>
         </form>
       </div>
 
-      {/* ─── DEVICE BIOMETRIC SECURITY ─── */}
+      {/* ─── DEVICE BIOMETRICS ─── */}
       <div className="card" style={{ padding: "1.25rem" }}>
-        <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", marginBottom: "1.25rem" }}>
-          <Fingerprint size={24} weight="duotone" style={{ color: "var(--color-success)", flexShrink: 0, marginTop: "2px" }} />
-          <div>
+        <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", marginBottom: "1rem" }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+            background: "linear-gradient(135deg, var(--color-success), hsl(152 60% 36%))",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#fff", boxShadow: "0 4px 12px hsl(152 60% 42% / 0.2)",
+          }}>
+            <Fingerprint size={20} weight="duotone" />
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <h2 style={{ fontSize: "0.875rem", fontWeight: 700, margin: 0 }}>Device Biometrics</h2>
-            <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "4px", lineHeight: 1.4 }}>
-              Enable quick biometric verification using fingerprint or Face ID to unlock the application instantly.
+            <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "4px", lineHeight: 1.5 }}>
+              Fingerprint or Face ID for instant app unlock.
             </p>
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", marginBottom: "0.5rem" }}>
-          <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-primary)" }}>
-            Biometric Unlock
-          </span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem", background: "var(--bg-surface)", borderRadius: "12px" }}>
+          <div>
+            <p style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>Biometric Unlock</p>
+            <p style={{ fontSize: "0.6875rem", color: "var(--text-muted)", margin: "2px 0 0 0" }}>
+              {biometricsEnabled ? "Active on this device" : "Not configured"}
+            </p>
+          </div>
           <button
-            type="button"
-            onClick={toggleBiometrics}
+            type="button" onClick={toggleBiometrics}
             className="btn"
             style={{
-              padding: "6px 14px",
-              fontSize: "0.75rem",
-              borderRadius: "10px",
-              backgroundColor: biometricsEnabled ? "var(--color-primary)" : "var(--bg-surface)",
-              color: biometricsEnabled ? "white" : "var(--text-primary)",
-              border: "1px solid var(--border)",
-              fontWeight: 700
+              height: "32px", padding: "0 14px", fontSize: "0.75rem", borderRadius: "10px",
+              backgroundColor: biometricsEnabled ? "var(--color-primary)" : "var(--bg-elevated)",
+              color: biometricsEnabled ? "#fff" : "var(--text-primary)",
+              border: "1.5px solid",
+              borderColor: biometricsEnabled ? "var(--color-primary)" : "var(--border)",
+              fontWeight: 700, minWidth: "80px",
             }}
           >
             {biometricsEnabled ? "Enabled" : "Disabled"}
           </button>
         </div>
 
-        <p style={{ fontSize: "0.6875rem", color: "var(--text-muted)", margin: 0, lineHeight: 1.4 }}>
-          ℹ️ Note: For security, biometric credentials are connected only to this local device. Logging in from a new device will require setting up biometrics again.
+        <p style={{ fontSize: "0.6875rem", color: "var(--text-muted)", marginTop: "0.75rem", lineHeight: 1.5, padding: "0.5rem 0.75rem", background: "var(--bg-surface)", borderRadius: "10px" }}>
+          ℹ️ Biometrics are device-specific. Re-enable when switching devices.
         </p>
       </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner {
+          width: 16px; height: 16px;
+          border: 2px solid rgba(255,255,255,0.3);
+          border-top-color: #fff;
+          border-radius: 50%;
+          animation: spin 0.6s linear infinite;
+          display: inline-block;
+        }
+        .btn-secondary .spinner {
+          border-color: rgba(0,0,0,0.15);
+          border-top-color: var(--text-primary);
+        }
+      `}</style>
     </div>
   );
 }

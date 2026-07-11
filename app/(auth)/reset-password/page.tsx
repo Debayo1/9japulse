@@ -55,7 +55,7 @@ function ResetPasswordContent() {
     startTransition(async () => {
       try {
         await updatePassword(newPassword);
-        toast.success("Password updated successfully! You can now log in with your new password.");
+        toast.success("Password updated! You can now log in.");
         router.push("/login");
       } catch (err: unknown) {
         toast.error((err as Error).message ?? "Failed to update password");
@@ -63,53 +63,61 @@ function ResetPasswordContent() {
     });
   };
 
-  // ── Verified state: Show "Set New Password" form ──────────────────────────
+  // ── Verified: Set New Password form ──────────────────────────────
   if (isVerified) {
     return (
-      <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", justifyContent: "center", padding: "2rem 1.5rem", maxWidth: 440, margin: "0 auto" }}>
-        <Link href="/login" style={{ display: "inline-flex", alignItems: "center", gap: "0.375rem", color: "var(--text-secondary)", textDecoration: "none", marginBottom: "2rem", fontSize: "0.875rem" }}>
+      <div className="auth-page">
+        <Link href="/login" style={{ display: "inline-flex", alignItems: "center", gap: "0.375rem", color: "var(--text-secondary)", textDecoration: "none", marginBottom: "2rem", fontSize: "0.8125rem", fontWeight: 500 }}>
           <ArrowLeft size={16} /> Back to login
         </Link>
 
-        <div style={{ marginBottom: "2rem" }}>
-          <h1 style={{ fontSize: "1.75rem", fontWeight: 800 }}>Set New Password</h1>
-          <p style={{ color: "var(--text-secondary)", marginTop: "0.5rem" }}>
-            Your identity has been verified. Choose a new password for your account.
-          </p>
+        <div className="auth-heading" style={{ textAlign: "left" }}>
+          <h1>Set New Password</h1>
+          <p>Your identity has been verified. Choose a new password.</p>
         </div>
 
-        <form onSubmit={handleSetNewPassword} className="animate-slide-up" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          <div style={{ position: "relative" }}>
-            <Lock size={18} color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-            <input
-              id="new-password"
-              name="new_password"
-              type="password"
-              placeholder="New password (min. 8 characters)"
-              required
-              minLength={8}
-              autoComplete="new-password"
-              className="input"
-              style={{ paddingLeft: "2.75rem" }}
-            />
+        <form onSubmit={handleSetNewPassword} className="animate-scale-in" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <div>
+            <label htmlFor="new-password" style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: "0.375rem" }}>
+              New Password
+            </label>
+            <div style={{ position: "relative" }}>
+              <Lock size={18} color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+              <input
+                id="new-password"
+                name="new_password"
+                type="password"
+                placeholder="Min. 8 characters"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                className="input"
+                style={{ paddingLeft: "2.75rem" }}
+              />
+            </div>
           </div>
 
-          <div style={{ position: "relative" }}>
-            <Lock size={18} color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-            <input
-              id="confirm-password"
-              name="confirm_password"
-              type="password"
-              placeholder="Confirm new password"
-              required
-              minLength={8}
-              autoComplete="new-password"
-              className="input"
-              style={{ paddingLeft: "2.75rem" }}
-            />
+          <div>
+            <label htmlFor="confirm-password" style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: "0.375rem" }}>
+              Confirm Password
+            </label>
+            <div style={{ position: "relative" }}>
+              <Lock size={18} color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+              <input
+                id="confirm-password"
+                name="confirm_password"
+                type="password"
+                placeholder="Re-enter password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                className="input"
+                style={{ paddingLeft: "2.75rem" }}
+              />
+            </div>
           </div>
 
-          <button id="reset-submit-btn" type="submit" className="btn btn-primary btn-full" disabled={isPending}>
+          <button id="reset-submit-btn" type="submit" className="btn btn-primary btn-full" style={{ height: "48px" }} disabled={isPending}>
             {isPending ? "Updating…" : "Update Password"}
           </button>
         </form>
@@ -117,36 +125,39 @@ function ResetPasswordContent() {
     );
   }
 
-  // ── Default state: Show "Send Reset Link" form ────────────────────────────
+  // ── Default: Send Reset Link form ────────────────────────────────
   return (
-    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", justifyContent: "center", padding: "2rem 1.5rem", maxWidth: 440, margin: "0 auto" }}>
-      <Link href="/login" style={{ display: "inline-flex", alignItems: "center", gap: "0.375rem", color: "var(--text-secondary)", textDecoration: "none", marginBottom: "2rem", fontSize: "0.875rem" }}>
+    <div className="auth-page">
+      <Link href="/login" style={{ display: "inline-flex", alignItems: "center", gap: "0.375rem", color: "var(--text-secondary)", textDecoration: "none", marginBottom: "2rem", fontSize: "0.8125rem", fontWeight: 500 }}>
         <ArrowLeft size={16} /> Back to login
       </Link>
 
-      <div style={{ marginBottom: "2rem" }}>
-        <h1 style={{ fontSize: "1.75rem", fontWeight: 800 }}>Reset Password</h1>
-        <p style={{ color: "var(--text-secondary)", marginTop: "0.5rem" }}>
-          Enter your email and we'll send you a link to reset your password.
-        </p>
+      <div className="auth-heading" style={{ textAlign: "left" }}>
+        <h1>Reset Password</h1>
+        <p>Enter your email and we&apos;ll send you a reset link.</p>
       </div>
 
-      <form onSubmit={handleSendLink} className="animate-slide-up" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <div style={{ position: "relative" }}>
-          <Envelope size={18} color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-          <input
-            id="reset-email"
-            name="email"
-            type="email"
-            placeholder="Your email address"
-            required
-            autoComplete="email"
-            className="input"
-            style={{ paddingLeft: "2.75rem" }}
-          />
+      <form onSubmit={handleSendLink} className="animate-scale-in" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <div>
+          <label htmlFor="reset-email" style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: "0.375rem" }}>
+            Email Address
+          </label>
+          <div style={{ position: "relative" }}>
+            <Envelope size={18} color="var(--text-muted)" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+            <input
+              id="reset-email"
+              name="email"
+              type="email"
+              placeholder="you@example.com"
+              required
+              autoComplete="email"
+              className="input"
+              style={{ paddingLeft: "2.75rem" }}
+            />
+          </div>
         </div>
 
-        <button id="reset-submit-btn" type="submit" className="btn btn-primary btn-full" disabled={isPending}>
+        <button id="reset-submit-btn" type="submit" className="btn btn-primary btn-full" style={{ height: "48px" }} disabled={isPending}>
           {isPending ? "Sending…" : "Send Reset Link"}
         </button>
       </form>
@@ -158,7 +169,7 @@ export default function ResetPasswordPage() {
   return (
     <Suspense fallback={
       <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div className="spinner" style={{ width: "24px", height: "24px" }} />
+        <div className="skeleton" style={{ width: "24px", height: "24px", borderRadius: "50%" }} />
       </div>
     }>
       <ResetPasswordContent />

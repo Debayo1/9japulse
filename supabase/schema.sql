@@ -1,12 +1,12 @@
--- =============================================================================
+﻿-- =============================================================================
 -- 9jaPulse Supabase Schema
 -- Run this in your Supabase SQL Editor (or via supabase db push)
 -- =============================================================================
 
--- ─── Extensions ────────────────────────────────────────────────────────────────
+-- â”€â”€â”€ Extensions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 create extension if not exists "pgcrypto";
 
--- ─── ENUM types ────────────────────────────────────────────────────────────────
+-- â”€â”€â”€ ENUM types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 do $$ begin
   create type transaction_direction as enum ('debit', 'credit');
 exception when duplicate_object then null; end $$;
@@ -15,7 +15,7 @@ do $$ begin
   create type transaction_status as enum ('pending', 'success', 'failed');
 exception when duplicate_object then null; end $$;
 
--- ─── profiles ──────────────────────────────────────────────────────────────────
+-- â”€â”€â”€ profiles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 create table if not exists profiles (
   id             uuid        primary key references auth.users(id) on delete cascade,
   email          text        not null,
@@ -52,7 +52,7 @@ create table if not exists platform_settings (
   updated_at          timestamptz not null default now()
 );
 
--- ─── wallets ───────────────────────────────────────────────────────────────────
+-- â”€â”€â”€ wallets â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 create table if not exists wallets (
   id                    uuid        primary key default gen_random_uuid(),
   user_id               uuid        not null unique references profiles(id) on delete cascade,
@@ -63,7 +63,7 @@ create table if not exists wallets (
   constraint wallet_withdrawable_lte_total check (balance_withdrawable <= balance_total)
 );
 
--- ─── transactions ──────────────────────────────────────────────────────────────
+-- â”€â”€â”€ transactions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 create table if not exists transactions (
   id            uuid                    primary key default gen_random_uuid(),
   wallet_id     uuid                    not null references wallets(id) on delete cascade,
@@ -73,6 +73,7 @@ create table if not exists transactions (
   direction     transaction_direction   not null,
   status        transaction_status      not null default 'pending',
   reference     text,
+  request_id    text                    unique,
   meta          jsonb,
   created_at    timestamptz             not null default now()
 );
@@ -81,7 +82,7 @@ create table if not exists transactions (
 create index if not exists idx_transactions_wallet_created
   on transactions (wallet_id, created_at desc);
 
--- ─── provider_keys ─────────────────────────────────────────────────────────────
+-- â”€â”€â”€ provider_keys â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- API keys are stored here and fetched server-side at runtime.
 -- Never expose this table to the frontend!
 create table if not exists provider_keys (
@@ -111,7 +112,7 @@ create table if not exists virtual_accounts (
   updated_at        timestamptz not null default now()
 );
 
--- ─── Auto-create wallet + profile on new user signup ──────────────────────────
+-- â”€â”€â”€ Auto-create wallet + profile on new user signup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 create or replace function public.handle_new_user()
 returns trigger as $$
 declare
@@ -138,7 +139,7 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
--- ─── Updated-at trigger ────────────────────────────────────────────────────────
+-- â”€â”€â”€ Updated-at trigger â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 create or replace function public.set_updated_at()
 returns trigger as $$
 begin
@@ -163,7 +164,7 @@ create trigger set_virtual_accounts_updated_at
   before update on virtual_accounts
   for each row execute procedure set_updated_at();
 
--- ─── data_plans ─────────────────────────────────────────────────────────────────
+-- â”€â”€â”€ data_plans â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 create table if not exists public.data_plans (
   id                  bigserial   primary key,
   service             text        not null,

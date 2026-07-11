@@ -1,11 +1,8 @@
-"use server";
-
+﻿"use server";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "./supabaseClient";
 import { createServerClient, createServiceClient } from "./supabaseServer";
 import { ensureDbColumnsExist } from "./dbAdmin";
-
-// ─── Sign Up ─────────────────────────────────────────────────────────────────
 export async function signUp(
   email: string,
   password: string,
@@ -17,14 +14,11 @@ export async function signUp(
     email,
     password,
     options: {
-      data: { full_name: fullName, phone, transaction_pin: pin },
+      data: { full_name: fullName, phone },
       emailRedirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
     },
   });
-
   if (error) throw new Error(error.message);
-
-  // Auto-confirm email to allow immediate login without verifying first
   if (data?.user) {
     try {
       const svc = createServiceClient();
@@ -34,44 +28,37 @@ export async function signUp(
     } catch (e) {
       console.warn("[9jaPulse] Failed to auto-confirm email on sign up:", e);
     }
+    try {
+      const svc = createServiceClient();
+      await (svc as any).from("profiles").update({ pin }).eq("id", data.user.id);
+    } catch (e2) {
+      console.warn("[9jaPulse] Failed to set PIN in profiles:", e2);
+    }
   }
-
   return data;
 }
-
-// ─── Sign In ─────────────────────────────────────────────────────────────────
 export async function signIn(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
-
   if (error) throw new Error(error.message);
   return data;
 }
-
-// ─── Sign Out ─────────────────────────────────────────────────────────────────
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) throw new Error(error.message);
 }
-
-// ─── Reset Password ───────────────────────────────────────────────────────────
 export async function resetPassword(email: string) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/reset-confirm`,
   });
-
   if (error) throw new Error(error.message);
 }
-
-// ─── Confirm Password Reset ───────────────────────────────────────────────────
 export async function updatePassword(newPassword: string) {
   const { error } = await supabase.auth.updateUser({ password: newPassword });
   if (error) throw new Error(error.message);
 }
-
-// ─── Update Transaction PIN ───────────────────────────────────────────────────
 export async function updateTransactionPin(
   currentPin: string | null,
   newPin: string,
@@ -85,7 +72,6 @@ export async function updateTransactionPin(
       refreshTokenOverride ?? null
     );
     if (!accessToken) throw new Error("Unauthorized");
-
     if (refreshToken) {
       const { error: sessionError } = await client.auth.setSession({
         access_token: accessToken,
@@ -93,10 +79,8 @@ export async function updateTransactionPin(
       });
       if (sessionError) throw new Error(sessionError.message);
     }
-
     const { data: { user }, error: userError } = await client.auth.getUser(accessToken);
     if (userError || !user) throw new Error("Unauthorized");
-
     let storedPin: string | null = null;
     try {
       const { data: profile } = await (client as any)
@@ -108,20 +92,16 @@ export async function updateTransactionPin(
     } catch (e) {
       console.warn("[9jaPulse] profiles.pin column missing or PostgREST cache stale during select:", e);
     }
-
     if (!storedPin) {
       storedPin = user.user_metadata?.transaction_pin || null;
     }
-
     if (storedPin && String(currentPin) !== String(storedPin)) {
       throw new Error("Incorrect current PIN");
     }
-
     const { error: dbError } = await (client as any)
       .from("profiles")
       .update({ pin: newPin })
       .eq("id", user.id);
-      
     if (dbError) {
       const isMissingColumn = dbError.code === "PGRST100" || 
                               dbError.message?.includes("column") || 
@@ -132,20 +112,15 @@ export async function updateTransactionPin(
       }
       console.warn("[9jaPulse] profiles.pin column missing or PostgREST cache stale. Storing PIN in auth metadata only.");
     }
-
     const { error: authError } = await client.auth.updateUser({
       data: { transaction_pin: newPin }
     });
     if (authError) throw new Error(authError.message);
-
     return { success: true };
   } catch (err: unknown) {
     throw new Error(err instanceof Error ? err.message : "Failed to update transaction PIN");
   }
 }
-
-
-// ─── Get Current Session ──────────────────────────────────────────────────────
 export async function getSession() {
   try {
     const { client, accessToken, refreshToken } = await createServerClient();
@@ -160,13 +135,10 @@ export async function getSession() {
     return null;
   }
 }
-
-// ─── Get Current User ─────────────────────────────────────────────────────────
 export async function getUser() {
   try {
     const { client, accessToken } = await createServerClient();
     if (!accessToken) return null;
-
     const fallbackUser = decodeUserFromJwt(accessToken);
     try {
       const { data, error } = await client.auth.getUser(accessToken);
@@ -174,17 +146,14 @@ export async function getUser() {
     } catch (error) {
       console.warn("[9jaPulse] Supabase auth lookup failed, falling back to cookie JWT:", error);
     }
-
     return fallbackUser;
   } catch {
     return null;
   }
 }
-
 function decodeUserFromJwt(token: string): User | null {
   const payload = parseJwtPayload(token);
   if (!payload?.sub) return null;
-
   return {
     id: payload.sub,
     aud: typeof payload.aud === "string" ? payload.aud : "authenticated",
@@ -199,11 +168,9 @@ function decodeUserFromJwt(token: string): User | null {
     identities: [],
   } as unknown as User;
 }
-
 function parseJwtPayload(token: string): Record<string, unknown> | null {
   const [, payload] = token.split(".");
   if (!payload) return null;
-
   try {
     const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
     const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
@@ -212,8 +179,6 @@ function parseJwtPayload(token: string): Record<string, unknown> | null {
     return null;
   }
 }
-
-// ─── App Lock Passcode Actions ────────────────────────────────────────────────
 export async function updateAppPasscode(
   currentPasscode: string | null,
   newPasscode: string,
@@ -226,66 +191,53 @@ export async function updateAppPasscode(
       refreshTokenOverride ?? null
     );
     if (!accessToken) throw new Error("Unauthorized");
-
     if (refreshToken) {
       await client.auth.setSession({
         access_token: accessToken,
         refresh_token: refreshToken,
       });
     }
-
     const { data: { user }, error: userError } = await client.auth.getUser(accessToken);
     if (userError || !user) throw new Error("Unauthorized");
-
     const svc = createServiceClient() as any;
-
     if (currentPasscode) {
       const { data: profile } = await svc
         .from("profiles")
         .select("passcode")
         .eq("id", user.id)
         .single();
-      
       if (profile?.passcode && String(profile.passcode) !== String(currentPasscode)) {
         throw new Error("Current passcode is incorrect");
       }
     }
-
     const { error } = await svc
       .from("profiles")
       .update({ passcode: newPasscode })
       .eq("id", user.id);
-
     if (error) throw new Error(error.message);
     return { success: true };
   } catch (err: any) {
     throw new Error(err.message || "Failed to update passcode");
   }
 }
-
 export async function verifyAppPasscodeAction(passcode: string): Promise<{ success: boolean; message: string }> {
   try {
     const { client, accessToken } = await createServerClient();
     if (!accessToken) throw new Error("Unauthorized");
-
     const { data: { user }, error: userError } = await client.auth.getUser(accessToken);
     if (userError || !user) throw new Error("Unauthorized");
-
     const svc = createServiceClient() as any;
     const { data: profile, error } = await svc
       .from("profiles")
       .select("passcode")
       .eq("id", user.id)
       .single();
-
     if (error || !profile) {
       throw new Error("Failed to load user profile passcode");
     }
-
     if (!profile.passcode) {
       return { success: true, message: "Passcode not set" };
     }
-
     if (String(passcode) === String(profile.passcode)) {
       return { success: true, message: "Passcode correct" };
     } else {
@@ -295,25 +247,20 @@ export async function verifyAppPasscodeAction(passcode: string): Promise<{ succe
     return { success: false, message: err.message || "Passcode verification failed" };
   }
 }
-
 export async function checkHasPasscodeAction(): Promise<{ success: boolean; hasPasscode: boolean }> {
   try {
     const { client, accessToken } = await createServerClient();
     if (!accessToken) return { success: false, hasPasscode: false };
-
     const { data: { user } } = await client.auth.getUser(accessToken);
     if (!user) return { success: false, hasPasscode: false };
-
     const svc = createServiceClient() as any;
     const { data: profile } = await svc
       .from("profiles")
       .select("passcode")
       .eq("id", user.id)
       .maybeSingle();
-
     return { success: true, hasPasscode: !!profile?.passcode };
   } catch {
     return { success: false, hasPasscode: false };
   }
 }
-

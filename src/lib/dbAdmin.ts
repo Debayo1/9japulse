@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { Client } from "pg";
 import fs from "fs";
@@ -159,11 +159,11 @@ export async function ensureDbColumnsExist(): Promise<void> {
         ('prod-2', 'Smart Fitness Watch', 'Heart rate monitoring, sleep tracking, AMOLED display and 7-day battery life.', 8500.00, 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500', 'Electronics', 4.5, 30),
         ('prod-3', 'Utility Cargo Trousers', 'Streetwear loose-fit multi-pocket cargo pants with drawstring waist and durable cotton build.', 12000.00, 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=500', 'Fashion', 4.3, 100),
         ('prod-4', 'Slim RFID Leather Wallet', 'Ultra-thin bifold wallet with RFID blocking technology and premium carbon finish.', 4500.00, 'https://images.unsplash.com/photo-1627124765135-56c33fc36baf?w=500', 'Fashion', 4.6, 120),
-        ('prod-5', 'Waterproof Bluetooth Speaker', 'IPX7-rated portable wireless speaker with 360° rich bass sound for outdoors.', 7500.00, 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=500', 'Electronics', 4.7, 45),
+        ('prod-5', 'Waterproof Bluetooth Speaker', 'IPX7-rated portable wireless speaker with 360Â° rich bass sound for outdoors.', 7500.00, 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=500', 'Electronics', 4.7, 45),
         ('prod-6', 'RGB LED Desk Lamp', 'Smart color-changing bedside lamp with 16 million colors and app-controlled lighting modes.', 6200.00, 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=500', 'Electronics', 4.4, 70),
         ('prod-7', 'Polarized Aviator Sunglasses', 'Classic gold-frame aviator shades with UV400 polarized lenses for style and eye protection.', 3500.00, 'https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=500', 'Fashion', 4.6, 85),
         ('prod-8', 'Large Travel Backpack', '40L waterproof backpack with USB charging port, laptop sleeve and anti-theft pockets.', 11500.00, 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500', 'Fashion', 4.8, 40),
-        ('prod-9', 'Portable Rechargeable Fan', 'USB mini turbo fan with 3 wind speeds and 8-hour battery — perfect for the Nigerian heat.', 3800.00, 'https://images.unsplash.com/photo-1585338107529-13afc5f02586?w=500', 'Gadgets', 4.3, 150),
+        ('prod-9', 'Portable Rechargeable Fan', 'USB mini turbo fan with 3 wind speeds and 8-hour battery â€” perfect for the Nigerian heat.', 3800.00, 'https://images.unsplash.com/photo-1585338107529-13afc5f02586?w=500', 'Gadgets', 4.3, 150),
         ('prod-10', 'Bluetooth GPS Key Tracker', 'Compact anti-lost tracker for keys, bags, and wallets with 90dB alarm ring.', 2500.00, 'https://images.unsplash.com/photo-1584438784894-089d6a128f3e?w=500', 'Gadgets', 4.1, 200),
         ('prod-11', '1080P Dashcam with Night Vision', 'Dual-lens dashboard recorder with loop recording, G-sensor, and clear night-time footage.', 24500.00, 'https://images.unsplash.com/photo-1508962914676-134849a727f0?w=500', 'Gadgets', 4.7, 25),
         ('prod-12', 'Ergonomic Vertical Mouse', 'Wireless vertical mouse that corrects wrist posture and reduces RSI with adjustable DPI.', 5500.00, 'https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=500', 'Gadgets', 4.5, 60),
@@ -305,7 +305,7 @@ export async function getProviderKeysAdmin(dbUrl: string): Promise<ProviderKeyRo
         id: row.id,
         provider: row.provider,
         key_name: row.key_name,
-        key_value: "••••••••",
+        key_value: "â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢",
         is_active: row.is_active,
         created_at: row.created_at ? new Date(row.created_at).toISOString() : "",
       }));
@@ -331,7 +331,7 @@ export async function getProviderKeysAdmin(dbUrl: string): Promise<ProviderKeyRo
     id: row.id,
     provider: row.provider,
     key_name: row.key_name,
-    key_value: "••••••••",
+    key_value: "â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢",
     is_active: row.is_active,
     created_at: row.created_at ? new Date(row.created_at).toISOString() : "",
   }));
@@ -511,11 +511,15 @@ export async function syncGSubzDataPlansAdmin(customDbUrl?: string): Promise<{ s
             `, [service, ...currentValues]);
           } else {
             // Replaced custom array exclusion with simpler Supabase API command
-            await svc
-              .from("data_plans")
-              .delete()
-              .eq("service", service)
-              .not("plan_value", "in", `(${currentValues.map(v => `"${v}"`).join(",")})`);
+            // Use array-style filter instead of raw string interpolation
+            const values = currentValues.map(v => v);
+            if (values.length > 0) {
+              await svc
+                .from("data_plans")
+                .delete()
+                .eq("service", service)
+                .in("plan_value", values);
+            }
           }
         }
       } catch (svcErr) {
