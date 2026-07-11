@@ -28,6 +28,11 @@ export default function HomePage() {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("Restoring...");
 
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isPulling, setIsPulling] = useState(false);
+  const [touchStart, setTouchStart] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+
   // Dashboard state variables
   const [wallet, setWallet] = useState<{ id: string; balance_total: number; balance_withdrawable: number } | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -102,6 +107,8 @@ export default function HomePage() {
       }, 2000);
     } finally {
       setLoading(false);
+      setRefreshing(false);
+      setPullDistance(0);
     }
   }, [router]);
 
@@ -170,6 +177,36 @@ export default function HomePage() {
     };
   }, [performBackgroundSync]);
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (typeof window !== "undefined" && window.scrollY === 0 && !refreshing) {
+      setTouchStart(e.touches[0].clientY);
+      setIsPulling(true);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isPulling || refreshing) return;
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - touchStart;
+    if (diff > 0) {
+      const distance = Math.min(diff * 0.4, 80);
+      setPullDistance(distance);
+      if (diff > 10 && e.cancelable) e.preventDefault();
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isPulling || refreshing) return;
+    setIsPulling(false);
+    if (pullDistance > 55) {
+      setRefreshing(true);
+      setPullDistance(55);
+      performBackgroundSync(true);
+    } else {
+      setPullDistance(0);
+    }
+  };
+
   if (loading) {
     return (
       <div className="page">
@@ -184,7 +221,39 @@ export default function HomePage() {
     <div
       className="page"
       style={{ position: "relative", overflowX: "hidden" }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
+      {/* Pull to Refresh Indicator */}
+      <div style={{
+        height: `${pullDistance}px`,
+        opacity: pullDistance > 0 ? 1 : 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: isPulling ? "none" : "height 0.15s ease, opacity 0.15s ease",
+        overflow: "hidden",
+        backgroundColor: "rgba(15, 23, 42, 0.4)",
+        borderRadius: "0 0 16px 16px",
+        borderBottom: pullDistance > 0 ? "1px solid var(--border)" : "none",
+        gap: "8px",
+        color: "var(--text-secondary)",
+        fontSize: "0.8rem",
+        fontWeight: 600,
+        width: "100%",
+        boxSizing: "border-box"
+      }}>
+        <div style={{
+          width: 16, height: 16, borderRadius: "50%",
+          border: "2px solid var(--color-primary)",
+          borderTopColor: "transparent",
+          transform: `rotate(${pullDistance * 4}deg)`,
+          transition: "transform 0.1s linear"
+        }} />
+        <span>{refreshing ? "Updating balance..." : pullDistance > 55 ? "Release to refresh" : "Pull to refresh"}</span>
+      </div>
+
       {/* Premium Floating Sync Status Pill */}
         {syncing && (
           <div style={{
@@ -218,6 +287,10 @@ export default function HomePage() {
           </div>
         )}
 
+        <div style={{
+          transform: `translateY(${refreshing ? 55 : pullDistance * 0.5}px)`,
+          transition: isPulling ? "none" : "transform 0.15s ease"
+        }}>
         {/* Top Header */}
         <Header type="dashboard" userName={fullName} />
 
@@ -313,6 +386,7 @@ export default function HomePage() {
 
         {/* Promo Wealth Banner */}
         <PromoBanner />
+        </div>
 
       <style>{`
         .service-shortcut {

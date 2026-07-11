@@ -273,33 +273,11 @@ export default function SecurityPage() {
             </div>
           </div>
 
-          <button type="submit" className="btn btn-primary btn-full" style={{ height: "46px", marginTop: "0.25rem" }} disabled={pinPending}>
+          <button type="submit" className="btn btn-primary btn-full" style={{ height: "46px", marginTop: "0.25rem" }} disabled={pinPending || passcodePending}>
             {pinPending ? "Updating…" : hasPin ? "Change Transaction PIN" : "Set Transaction PIN"}
           </button>
         </form>
 
-        {pinPending && (
-          <div style={{
-            position: "fixed", inset: 0, zIndex: 120,
-            backgroundColor: "var(--bg-base)",
-            display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center", gap: "1rem",
-          }}>
-            <div style={{
-              width: 48, height: 48,
-              border: "4px solid var(--border)",
-              borderTopColor: "var(--color-primary)",
-              borderRadius: "50%",
-              animation: "sec-spin 0.7s linear infinite",
-            }} />
-            <p style={{ fontSize: "1rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
-              Verifying your identity...
-            </p>
-            <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: 0 }}>
-              Please wait while we update your security settings
-            </p>
-          </div>
-        )}
       </div>
 
       {/* ─── APP LOCK PASSCODE ─── */}
@@ -384,33 +362,11 @@ export default function SecurityPage() {
             </div>
           </div>
 
-          <button type="submit" className="btn btn-secondary btn-full" style={{ height: "46px", marginTop: "0.25rem" }} disabled={passcodePending}>
+          <button type="submit" className="btn btn-secondary btn-full" style={{ height: "46px", marginTop: "0.25rem" }} disabled={pinPending || passcodePending}>
             {passcodePending ? "Updating…" : hasPasscode ? "Change App Passcode" : "Set App Passcode"}
           </button>
         </form>
 
-        {passcodePending && (
-          <div style={{
-            position: "fixed", inset: 0, zIndex: 120,
-            backgroundColor: "var(--bg-base)",
-            display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center", gap: "1rem",
-          }}>
-            <div style={{
-              width: 48, height: 48,
-              border: "4px solid var(--border)",
-              borderTopColor: "var(--color-accent)",
-              borderRadius: "50%",
-              animation: "sec-spin 0.7s linear infinite",
-            }} />
-            <p style={{ fontSize: "1rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
-              Verifying your identity...
-            </p>
-            <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: 0 }}>
-              Please wait while we update your security settings
-            </p>
-          </div>
-        )}
       </div>
 
       {/* ─── DEVICE BIOMETRICS ─── */}
@@ -459,6 +415,29 @@ export default function SecurityPage() {
           ℹ️ Biometrics are device-specific. Re-enable when switching devices.
         </p>
       </div>
+
+      {(pinPending || passcodePending) && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 999,
+          backgroundColor: "var(--bg-base)",
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center", gap: "1.25rem",
+        }}>
+          <div style={{
+            width: 56, height: 56,
+            border: "4px solid var(--border)",
+            borderTopColor: pinPending ? "var(--color-primary)" : "var(--color-accent)",
+            borderRadius: "50%",
+            animation: "sec-spin 0.7s linear infinite",
+          }} />
+          <p style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
+            Verifying your identity...
+          </p>
+          <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: 0 }}>
+            Please wait while we update your security settings
+          </p>
+        </div>
+      )}
 
       <style>{`
         @keyframes sec-spin { to { transform: rotate(360deg); } }

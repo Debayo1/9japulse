@@ -206,7 +206,8 @@ export default function PinKeypad({
           backgroundColor: "var(--bg-base)",
           display: "flex", flexDirection: "column",
           alignItems: "center", justifyContent: "center",
-          zIndex: 10, gap: "1rem",
+          zIndex: 999, gap: "1rem",
+          animation: "fadeIn 0.15s ease",
         }}>
           <div style={{
             width: 48, height: 48,
@@ -239,6 +240,7 @@ export default function PinKeypad({
 
       <style>{`
         @keyframes pin-spin { to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
     </div>
   );
