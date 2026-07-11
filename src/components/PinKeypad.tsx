@@ -201,17 +201,26 @@ export default function PinKeypad({
       </div>
 
       {loading && (
-        <div
-          style={{
-            color: "var(--text-secondary)",
-            fontSize: "0.8125rem",
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-          }}
-        >
-          <div className="spinner" style={{ width: "16px", height: "16px" }} />
-          Verifying PIN & Processing...
+        <div style={{
+          position: "absolute", inset: 0,
+          backgroundColor: "var(--bg-base)",
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
+          zIndex: 10, gap: "1rem",
+        }}>
+          <div style={{
+            width: 48, height: 48,
+            border: "4px solid var(--border)",
+            borderTopColor: "var(--color-primary)",
+            borderRadius: "50%",
+            animation: "pin-spin 0.7s linear infinite",
+          }} />
+          <p style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
+            Verifying PIN...
+          </p>
+          <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: 0 }}>
+            Processing your transaction
+          </p>
         </div>
       )}
 
@@ -227,6 +236,10 @@ export default function PinKeypad({
           {error}
         </div>
       )}
+
+      <style>{`
+        @keyframes pin-spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }

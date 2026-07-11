@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, Key, Fingerprint, Eye, EyeClosed, CheckCircle, XCircle } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -10,7 +10,8 @@ import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 export default function SecurityPage() {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [pinPending, setPinPending] = useState(false);
+  const [passcodePending, setPasscodePending] = useState(false);
 
   const [hasPin, setHasPin] = useState(false);
   const [hasPasscode, setHasPasscode] = useState(false);
@@ -59,48 +60,50 @@ export default function SecurityPage() {
     setter(val.slice(0, 4).replace(/[^0-9]/g, ""));
   };
 
-  const handlePinSubmit = (e: React.FormEvent) => {
+  const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (hasPin && currentPin.length !== 4) { toast.error("Enter your current 4-digit PIN"); return; }
     if (newPin.length !== 4) { toast.error("New PIN must be exactly 4 digits"); return; }
     if (newPin !== confirmPin) { toast.error("PINs do not match"); return; }
 
-    startTransition(async () => {
-      try {
-        const { data: sessionData } = await supabaseBrowser.auth.getSession();
-        const session = sessionData?.session;
-        if (!session?.access_token || !session.refresh_token) throw new Error("Auth session missing");
+    setPinPending(true);
+    try {
+      const { data: sessionData } = await supabaseBrowser.auth.getSession();
+      const session = sessionData?.session;
+      if (!session?.access_token || !session.refresh_token) throw new Error("Auth session missing");
 
-        await updateTransactionPin(hasPin ? currentPin : null, newPin, session.access_token, session.refresh_token);
-        toast.success(hasPin ? "PIN updated successfully!" : "PIN set successfully!");
-        setHasPin(true);
-        setCurrentPin(""); setNewPin(""); setConfirmPin("");
-      } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "Failed to update PIN");
-      }
-    });
+      await updateTransactionPin(hasPin ? currentPin : null, newPin, session.access_token, session.refresh_token);
+      toast.success(hasPin ? "PIN updated successfully!" : "PIN set successfully!");
+      setHasPin(true);
+      setCurrentPin(""); setNewPin(""); setConfirmPin("");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to update PIN");
+    } finally {
+      setPinPending(false);
+    }
   };
 
-  const handlePasscodeSubmit = (e: React.FormEvent) => {
+  const handlePasscodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (hasPasscode && currentPasscode.length !== 4) { toast.error("Enter your current 4-digit passcode"); return; }
     if (newPasscode.length !== 4) { toast.error("New passcode must be exactly 4 digits"); return; }
     if (newPasscode !== confirmPasscode) { toast.error("Passcodes do not match"); return; }
 
-    startTransition(async () => {
-      try {
-        const { data: sessionData } = await supabaseBrowser.auth.getSession();
-        const session = sessionData?.session;
-        if (!session?.access_token || !session.refresh_token) throw new Error("Auth session missing");
+    setPasscodePending(true);
+    try {
+      const { data: sessionData } = await supabaseBrowser.auth.getSession();
+      const session = sessionData?.session;
+      if (!session?.access_token || !session.refresh_token) throw new Error("Auth session missing");
 
-        await updateAppPasscode(hasPasscode ? currentPasscode : null, newPasscode, session.access_token, session.refresh_token);
-        toast.success(hasPasscode ? "Passcode updated!" : "Passcode set!");
-        setHasPasscode(true);
-        setCurrentPasscode(""); setNewPasscode(""); setConfirmPasscode("");
-      } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "Failed to update passcode");
-      }
-    });
+      await updateAppPasscode(hasPasscode ? currentPasscode : null, newPasscode, session.access_token, session.refresh_token);
+      toast.success(hasPasscode ? "Passcode updated!" : "Passcode set!");
+      setHasPasscode(true);
+      setCurrentPasscode(""); setNewPasscode(""); setConfirmPasscode("");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to update passcode");
+    } finally {
+      setPasscodePending(false);
+    }
   };
 
   const toggleBiometrics = async () => {
@@ -270,11 +273,33 @@ export default function SecurityPage() {
             </div>
           </div>
 
-          <button type="submit" className="btn btn-primary btn-full" style={{ height: "46px", marginTop: "0.25rem" }} disabled={isPending}>
-            {isPending && <span className="spinner" />}
-            {isPending ? "Updating…" : hasPin ? "Change Transaction PIN" : "Set Transaction PIN"}
+          <button type="submit" className="btn btn-primary btn-full" style={{ height: "46px", marginTop: "0.25rem" }} disabled={pinPending}>
+            {pinPending ? "Updating…" : hasPin ? "Change Transaction PIN" : "Set Transaction PIN"}
           </button>
         </form>
+
+        {pinPending && (
+          <div style={{
+            position: "fixed", inset: 0, zIndex: 120,
+            backgroundColor: "var(--bg-base)",
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", gap: "1rem",
+          }}>
+            <div style={{
+              width: 48, height: 48,
+              border: "4px solid var(--border)",
+              borderTopColor: "var(--color-primary)",
+              borderRadius: "50%",
+              animation: "sec-spin 0.7s linear infinite",
+            }} />
+            <p style={{ fontSize: "1rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
+              Verifying your identity...
+            </p>
+            <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: 0 }}>
+              Please wait while we update your security settings
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ─── APP LOCK PASSCODE ─── */}
@@ -359,11 +384,33 @@ export default function SecurityPage() {
             </div>
           </div>
 
-          <button type="submit" className="btn btn-secondary btn-full" style={{ height: "46px", marginTop: "0.25rem" }} disabled={isPending}>
-            {isPending && <span className="spinner" />}
-            {isPending ? "Updating…" : hasPasscode ? "Change App Passcode" : "Set App Passcode"}
+          <button type="submit" className="btn btn-secondary btn-full" style={{ height: "46px", marginTop: "0.25rem" }} disabled={passcodePending}>
+            {passcodePending ? "Updating…" : hasPasscode ? "Change App Passcode" : "Set App Passcode"}
           </button>
         </form>
+
+        {passcodePending && (
+          <div style={{
+            position: "fixed", inset: 0, zIndex: 120,
+            backgroundColor: "var(--bg-base)",
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", gap: "1rem",
+          }}>
+            <div style={{
+              width: 48, height: 48,
+              border: "4px solid var(--border)",
+              borderTopColor: "var(--color-accent)",
+              borderRadius: "50%",
+              animation: "sec-spin 0.7s linear infinite",
+            }} />
+            <p style={{ fontSize: "1rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
+              Verifying your identity...
+            </p>
+            <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: 0 }}>
+              Please wait while we update your security settings
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ─── DEVICE BIOMETRICS ─── */}
@@ -414,19 +461,7 @@ export default function SecurityPage() {
       </div>
 
       <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .spinner {
-          width: 16px; height: 16px;
-          border: 2px solid rgba(255,255,255,0.3);
-          border-top-color: #fff;
-          border-radius: 50%;
-          animation: spin 0.6s linear infinite;
-          display: inline-block;
-        }
-        .btn-secondary .spinner {
-          border-color: rgba(0,0,0,0.15);
-          border-top-color: var(--text-primary);
-        }
+        @keyframes sec-spin { to { transform: rotate(360deg); } }
       `}</style>
     </div>
   );
