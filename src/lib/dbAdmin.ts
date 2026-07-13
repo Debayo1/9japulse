@@ -614,6 +614,7 @@ export async function syncGSubzDataPlansAdmin(customDbUrl?: string): Promise<{ s
     try {
       client = new Client({ connectionString: dbUrl });
       await client.connect();
+      console.log("[9jaPulse] Sync using direct PG connection");
     } catch (err) {
       console.warn("[9jaPulse] PG direct connection failed in syncGSubzDataPlansAdmin, falling back to HTTPS client:", err);
       useHttpsFallback = true;
@@ -621,6 +622,7 @@ export async function syncGSubzDataPlansAdmin(customDbUrl?: string): Promise<{ s
     }
   } else {
     useHttpsFallback = true;
+    console.log("[9jaPulse] Sync using HTTPS fallback (no DATABASE_URL)");
   }
 
   try {
@@ -643,6 +645,8 @@ export async function syncGSubzDataPlansAdmin(customDbUrl?: string): Promise<{ s
         const discount = data.discount || "0%";
         const fixedPrice = data.fixedPrice !== false;
         const fullName = data.service || service.replace(/_/g, " ").toUpperCase();
+        const planCount = data.plans?.length ?? 0;
+        console.log(`[9jaPulse] Syncing ${service}: ${planCount} plans from API`);
 
         const currentValues: string[] = [];
 
@@ -684,6 +688,8 @@ export async function syncGSubzDataPlansAdmin(customDbUrl?: string): Promise<{ s
           totalSynced++;
         }
 
+        console.log(`[9jaPulse] ${service}: upserted ${currentValues.length} plans`);
+
         // Delete plans that no longer exist for this service
         if (currentValues.length > 0) {
           if (client && !useHttpsFallback) {
@@ -693,14 +699,23 @@ export async function syncGSubzDataPlansAdmin(customDbUrl?: string): Promise<{ s
               WHERE service = $1 AND plan_value NOT IN (${placeholders})
             `, [service, ...currentValues]);
           } else {
-            const values = currentValues.map(v => v);
-            if (values.length > 0) {
-              const valuesList = `(${values.map(v => v.replace(/[()]/g, "")).join(",")})`;
-              await svc
-                .from("data_plans")
-                .delete()
-                .eq("service", service)
-                .not("plan_value", "in", valuesList);
+            const { data: existingPlans } = await svc
+              .from("data_plans")
+              .select("plan_value")
+              .eq("service", service);
+
+            if (existingPlans && existingPlans.length > 0) {
+              const toDelete = existingPlans
+                .map((p: any) => p.plan_value)
+                .filter((pv: string) => !currentValues.includes(pv));
+
+              for (const pv of toDelete) {
+                await svc
+                  .from("data_plans")
+                  .delete()
+                  .eq("service", service)
+                  .eq("plan_value", pv);
+              }
             }
           }
         }
