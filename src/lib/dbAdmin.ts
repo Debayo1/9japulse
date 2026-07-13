@@ -203,6 +203,189 @@ export async function ensureDbColumnsExist(): Promise<void> {
       ] WHERE id = 'prod-3';
     `);
 
+    // 8. Ensure sellers table exists (admin-approved sellers)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public.sellers (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id uuid NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+        display_name text NOT NULL,
+        description text,
+        phone text,
+        email text,
+        avatar_url text,
+        status text NOT NULL DEFAULT 'pending',
+        approved_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+
+    // 9. Ensure seller_products table exists
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public.seller_products (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        seller_id uuid NOT NULL REFERENCES public.sellers(id) ON DELETE CASCADE,
+        title text NOT NULL,
+        description text,
+        price numeric(12,2) NOT NULL,
+        image_url text,
+        images text[] DEFAULT '{}',
+        category text NOT NULL DEFAULT 'General',
+        stock_quantity integer NOT NULL DEFAULT 0,
+        is_active boolean NOT NULL DEFAULT true,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+
+    // 10. Ensure seller_orders table exists (escrow-based orders)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public.seller_orders (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        buyer_id uuid NOT NULL REFERENCES auth.users(id),
+        seller_id uuid NOT NULL REFERENCES public.sellers(id),
+        product_id uuid NOT NULL REFERENCES public.seller_products(id),
+        product_title text NOT NULL,
+        product_image text,
+        quantity integer NOT NULL DEFAULT 1,
+        amount numeric(12,2) NOT NULL,
+        commission numeric(12,2) NOT NULL DEFAULT 0,
+        seller_payout numeric(12,2) NOT NULL DEFAULT 0,
+        status text NOT NULL DEFAULT 'pending',
+        reference text NOT NULL UNIQUE,
+        shipping_name text NOT NULL,
+        shipping_phone text NOT NULL,
+        shipping_address text NOT NULL,
+        confirmed_at timestamptz,
+        released_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+
+    // 11. Ensure seller_wallets table exists (holds escrowed funds)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public.seller_wallets (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        seller_id uuid NOT NULL UNIQUE REFERENCES public.sellers(id) ON DELETE CASCADE,
+        balance_available numeric(15,2) NOT NULL DEFAULT 0,
+        balance_held numeric(15,2) NOT NULL DEFAULT 0,
+        total_earned numeric(15,2) NOT NULL DEFAULT 0,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+
+    // 12. Ensure bot_subscriptions table exists
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public.bot_subscriptions (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+        channel text NOT NULL,
+        plan text NOT NULL DEFAULT 'free',
+        messages_used integer NOT NULL DEFAULT 0,
+        messages_limit integer,
+        expires_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (user_id, channel)
+      );
+    `);
+
+    // 13. Ensure chat_conversations table exists
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public.chat_conversations (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+        channel text NOT NULL,
+        channel_user_id text NOT NULL,
+        platform_metadata jsonb,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (user_id, channel, channel_user_id)
+      );
+    `);
+
+    // 14. Ensure chat_messages table exists
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public.chat_messages (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        conversation_id uuid NOT NULL REFERENCES public.chat_conversations(id) ON DELETE CASCADE,
+        role text NOT NULL,
+        content text NOT NULL,
+        tool_calls jsonb,
+        tool_result jsonb,
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation
+      ON public.chat_messages (conversation_id, created_at DESC);
+    `);
+
+    // 15. Add bot/seller columns to platform_settings if missing
+    await client.query(`
+      ALTER TABLE public.platform_settings ADD COLUMN IF NOT EXISTS bot_enabled boolean NOT NULL DEFAULT false;
+      ALTER TABLE public.platform_settings ADD COLUMN IF NOT EXISTS bot_free_messages_per_day integer NOT NULL DEFAULT 3;
+      ALTER TABLE public.platform_settings ADD COLUMN IF NOT EXISTS bot_daily_price numeric(12,2) NOT NULL DEFAULT 500;
+      ALTER TABLE public.platform_settings ADD COLUMN IF NOT EXISTS bot_weekly_price numeric(12,2) NOT NULL DEFAULT 2500;
+      ALTER TABLE public.platform_settings ADD COLUMN IF NOT EXISTS bot_monthly_price numeric(12,2) NOT NULL DEFAULT 8000;
+      ALTER TABLE public.platform_settings ADD COLUMN IF NOT EXISTS bot_welcome_message text NOT NULL DEFAULT 'Welcome to 9jaPulse Bot! I can help you buy airtime, data, and more.';
+      ALTER TABLE public.platform_settings ADD COLUMN IF NOT EXISTS seller_enabled boolean NOT NULL DEFAULT false;
+      ALTER TABLE public.platform_settings ADD COLUMN IF NOT EXISTS seller_commission_rate numeric(5,2) NOT NULL DEFAULT 5;
+      ALTER TABLE public.platform_settings ADD COLUMN IF NOT EXISTS seller_auto_release_days integer NOT NULL DEFAULT 7;
+    `);
+
+    // 16. Add seller_id column to marketplace_products for seller-linked listings
+    await client.query(`
+      ALTER TABLE public.marketplace_products ADD COLUMN IF NOT EXISTS seller_id uuid REFERENCES public.sellers(id);
+    `);
+
+    // 17. Add passcode column to profiles if missing (for chat PIN verification)
+    await client.query(`
+      ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS passcode text;
+    `);
+
+    // 18. Ensure set_updated_at function and triggers for new tables
+    await client.query(`
+      CREATE OR REPLACE FUNCTION public.set_updated_at()
+      RETURNS trigger AS $$
+      BEGIN
+        new.updated_at = now();
+        RETURN new;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'set_sellers_updated_at') THEN
+          CREATE TRIGGER set_sellers_updated_at BEFORE UPDATE ON public.sellers
+          FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'set_seller_products_updated_at') THEN
+          CREATE TRIGGER set_seller_products_updated_at BEFORE UPDATE ON public.seller_products
+          FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'set_seller_orders_updated_at') THEN
+          CREATE TRIGGER set_seller_orders_updated_at BEFORE UPDATE ON public.seller_orders
+          FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'set_seller_wallets_updated_at') THEN
+          CREATE TRIGGER set_seller_wallets_updated_at BEFORE UPDATE ON public.seller_wallets
+          FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'set_bot_subscriptions_updated_at') THEN
+          CREATE TRIGGER set_bot_subscriptions_updated_at BEFORE UPDATE ON public.bot_subscriptions
+          FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'set_chat_conversations_updated_at') THEN
+          CREATE TRIGGER set_chat_conversations_updated_at BEFORE UPDATE ON public.chat_conversations
+          FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+        END IF;
+      END $$;
+    `);
+
     isDbVerified = true;
     console.log("[9jaPulse] Database self-healing schema checks verified successfully.");
   } catch (err: unknown) {
@@ -510,15 +693,14 @@ export async function syncGSubzDataPlansAdmin(customDbUrl?: string): Promise<{ s
               WHERE service = $1 AND plan_value NOT IN (${placeholders})
             `, [service, ...currentValues]);
           } else {
-            // Replaced custom array exclusion with simpler Supabase API command
-            // Use array-style filter instead of raw string interpolation
             const values = currentValues.map(v => v);
             if (values.length > 0) {
+              const valuesList = `(${values.map(v => v.replace(/[()]/g, "")).join(",")})`;
               await svc
                 .from("data_plans")
                 .delete()
                 .eq("service", service)
-                .in("plan_value", values);
+                .not("plan_value", "in", valuesList);
             }
           }
         }

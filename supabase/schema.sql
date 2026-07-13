@@ -178,3 +178,121 @@ create table if not exists public.data_plans (
   unique (service, plan_value)
 );
 
+-- ──── sellers (admin-approved marketplace sellers) ──────────────────────
+create table if not exists public.sellers (
+  id              uuid        primary key default gen_random_uuid(),
+  user_id         uuid        not null unique references auth.users(id) on delete cascade,
+  display_name    text        not null,
+  description     text,
+  phone           text,
+  email           text,
+  avatar_url      text,
+  status          text        not null default 'pending',
+  approved_at     timestamptz,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+
+-- ──── seller_products ───────────────────────────────────────────────────
+create table if not exists public.seller_products (
+  id              uuid        primary key default gen_random_uuid(),
+  seller_id       uuid        not null references public.sellers(id) on delete cascade,
+  title           text        not null,
+  description     text,
+  price           numeric(12,2) not null,
+  image_url       text,
+  images          text[]      default '{}',
+  category        text        not null default 'General',
+  stock_quantity  integer     not null default 0,
+  is_active       boolean     not null default true,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+
+-- ──── seller_orders (escrow-based) ─────────────────────────────────────
+create table if not exists public.seller_orders (
+  id              uuid        primary key default gen_random_uuid(),
+  buyer_id        uuid        not null references auth.users(id),
+  seller_id       uuid        not null references public.sellers(id),
+  product_id      uuid        not null references public.seller_products(id),
+  product_title   text        not null,
+  product_image   text,
+  quantity        integer     not null default 1,
+  amount          numeric(12,2) not null,
+  commission      numeric(12,2) not null default 0,
+  seller_payout   numeric(12,2) not null default 0,
+  status          text        not null default 'pending',
+  reference       text        not null unique,
+  shipping_name   text        not null,
+  shipping_phone  text        not null,
+  shipping_address text       not null,
+  confirmed_at    timestamptz,
+  released_at     timestamptz,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+
+-- ──── seller_wallets (escrowed funds) ──────────────────────────────────
+create table if not exists public.seller_wallets (
+  id                 uuid        primary key default gen_random_uuid(),
+  seller_id          uuid        not null unique references public.sellers(id) on delete cascade,
+  balance_available  numeric(15,2) not null default 0,
+  balance_held       numeric(15,2) not null default 0,
+  total_earned       numeric(15,2) not null default 0,
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now()
+);
+
+-- ──── bot_subscriptions ────────────────────────────────────────────────
+create table if not exists public.bot_subscriptions (
+  id              uuid        primary key default gen_random_uuid(),
+  user_id         uuid        not null references auth.users(id) on delete cascade,
+  channel         text        not null,
+  plan            text        not null default 'free',
+  messages_used   integer     not null default 0,
+  messages_limit  integer,
+  expires_at      timestamptz,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now(),
+  unique (user_id, channel)
+);
+
+-- ──── chat_conversations ───────────────────────────────────────────────
+create table if not exists public.chat_conversations (
+  id                uuid        primary key default gen_random_uuid(),
+  user_id           uuid        not null references auth.users(id) on delete cascade,
+  channel           text        not null,
+  channel_user_id   text        not null,
+  platform_metadata jsonb,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now(),
+  unique (user_id, channel, channel_user_id)
+);
+
+-- ──── chat_messages ────────────────────────────────────────────────────
+create table if not exists public.chat_messages (
+  id              uuid        primary key default gen_random_uuid(),
+  conversation_id uuid        not null references public.chat_conversations(id) on delete cascade,
+  role            text        not null,
+  content         text        not null,
+  tool_calls      jsonb,
+  tool_result     jsonb,
+  created_at      timestamptz not null default now()
+);
+create index if not exists idx_chat_messages_conversation
+  on public.chat_messages (conversation_id, created_at desc);
+
+-- ──── bot/seller columns on platform_settings ─────────────────────────
+alter table public.platform_settings add column if not exists bot_enabled boolean not null default false;
+alter table public.platform_settings add column if not exists bot_free_messages_per_day integer not null default 3;
+alter table public.platform_settings add column if not exists bot_daily_price numeric(12,2) not null default 500;
+alter table public.platform_settings add column if not exists bot_weekly_price numeric(12,2) not null default 2500;
+alter table public.platform_settings add column if not exists bot_monthly_price numeric(12,2) not null default 8000;
+alter table public.platform_settings add column if not exists bot_welcome_message text not null default 'Welcome to 9jaPulse Bot! I can help you buy airtime, data, and more.';
+alter table public.platform_settings add column if not exists seller_enabled boolean not null default false;
+alter table public.platform_settings add column if not exists seller_commission_rate numeric(5,2) not null default 5;
+alter table public.platform_settings add column if not exists seller_auto_release_days integer not null default 7;
+
+-- ──── seller_id on marketplace_products ────────────────────────────────
+alter table public.marketplace_products add column if not exists seller_id uuid references public.sellers(id);
+
