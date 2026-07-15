@@ -87,3 +87,15 @@ create policy "No direct client data_plans writes"
   on data_plans for all
   using (false)
   with check (false);
+
+-- ─── gift_codes ───────────────────────────────────────────────────────────
+alter table gift_codes enable row level security;
+
+create policy "Users can read own gift codes"
+  on gift_codes for select
+  using (auth.uid() = created_by OR auth.uid() = redeemed_by);
+
+create policy "No direct client gift_codes writes"
+  on gift_codes for all
+  using (false)
+  with check (false);

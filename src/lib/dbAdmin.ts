@@ -346,6 +346,35 @@ export async function ensureDbColumnsExist(): Promise<void> {
       ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS passcode text;
     `);
 
+    // 18. Add username column to profiles
+    await client.query(`
+      ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS username text;
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_username ON public.profiles (username) WHERE username IS NOT NULL;
+    `);
+
+    // 19. Ensure gift_codes table exists
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public.gift_codes (
+        id            uuid        primary key default gen_random_uuid(),
+        code          text        not null unique,
+        amount        numeric(15,2) not null check (amount > 0),
+        created_by    uuid        not null references auth.users(id) on delete cascade,
+        redeemed_by   uuid        references auth.users(id),
+        status        text        not null default 'active' check (status in ('active', 'redeemed', 'expired', 'cancelled')),
+        message       text,
+        created_at    timestamptz not null default now(),
+        redeemed_at   timestamptz,
+        expires_at    timestamptz
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gift_codes_code ON public.gift_codes (code);
+      CREATE INDEX IF NOT EXISTS idx_gift_codes_created_by ON public.gift_codes (created_by);
+      CREATE INDEX IF NOT EXISTS idx_gift_codes_redeemed_by ON public.gift_codes (redeemed_by);
+    `);
+
     // 18. Ensure set_updated_at function and triggers for new tables
     await client.query(`
       CREATE OR REPLACE FUNCTION public.set_updated_at()

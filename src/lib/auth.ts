@@ -247,6 +247,52 @@ export async function verifyAppPasscodeAction(passcode: string): Promise<{ succe
     return { success: false, message: err.message || "Passcode verification failed" };
   }
 }
+export async function verifyTransactionPin(
+  pin: string,
+  accessTokenOverride?: string,
+  refreshTokenOverride?: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const { client, accessToken, refreshToken } = await createServerClient(
+      accessTokenOverride ?? null,
+      refreshTokenOverride ?? null
+    );
+    if (!accessToken) throw new Error("Unauthorized");
+    if (refreshToken) {
+      await client.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+    }
+    const { data: { user }, error: userError } = await client.auth.getUser(accessToken);
+    if (userError || !user) throw new Error("Unauthorized");
+
+    const svc = createServiceClient() as any;
+    const { data: profile, error: profileError } = await svc
+      .from("profiles")
+      .select("pin")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || !profile) {
+      throw new Error("Failed to load profile");
+    }
+
+    const storedPin = profile.pin || user.user_metadata?.transaction_pin || null;
+    if (!storedPin) {
+      return { success: false, message: "No transaction PIN set. Set one in Security settings." };
+    }
+
+    if (String(pin) !== String(storedPin)) {
+      return { success: false, message: "Incorrect transaction PIN" };
+    }
+
+    return { success: true, message: "PIN verified" };
+  } catch (err: any) {
+    return { success: false, message: err.message || "PIN verification failed" };
+  }
+}
+
 export async function checkHasPasscodeAction(): Promise<{ success: boolean; hasPasscode: boolean }> {
   try {
     const { client, accessToken } = await createServerClient();

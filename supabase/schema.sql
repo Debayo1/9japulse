@@ -296,3 +296,24 @@ alter table public.platform_settings add column if not exists seller_auto_releas
 -- ──── seller_id on marketplace_products ────────────────────────────────
 alter table public.marketplace_products add column if not exists seller_id uuid references public.sellers(id);
 
+-- ──── username on profiles ──────────────────────────────────────────────
+alter table public.profiles add column if not exists username text unique;
+
+-- ──── gift_codes ────────────────────────────────────────────────────────
+create table if not exists public.gift_codes (
+  id            uuid        primary key default gen_random_uuid(),
+  code          text        not null unique,
+  amount        numeric(15,2) not null check (amount > 0),
+  created_by    uuid        not null references auth.users(id) on delete cascade,
+  redeemed_by   uuid        references auth.users(id),
+  status        text        not null default 'active' check (status in ('active', 'redeemed', 'expired', 'cancelled')),
+  message       text,
+  created_at    timestamptz not null default now(),
+  redeemed_at   timestamptz,
+  expires_at    timestamptz
+);
+
+create index if not exists idx_gift_codes_code on public.gift_codes (code);
+create index if not exists idx_gift_codes_created_by on public.gift_codes (created_by);
+create index if not exists idx_gift_codes_redeemed_by on public.gift_codes (redeemed_by);
+

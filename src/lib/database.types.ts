@@ -22,6 +22,7 @@ export type ProfileRow = {
   avatar_url: string | null;
   referral_code: string | null;
   referred_by: string | null;
+  username: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -198,6 +199,19 @@ export type ChatMessageRow = {
   created_at: string;
 };
 
+export type GiftCodeRow = {
+  id: string;
+  code: string;
+  amount: number;
+  created_by: string;
+  redeemed_by: string | null;
+  status: "active" | "redeemed" | "expired" | "cancelled";
+  message: string | null;
+  created_at: string;
+  redeemed_at: string | null;
+  expires_at: string | null;
+};
+
 export interface Database {
   public: {
     Tables: {
@@ -265,6 +279,11 @@ export interface Database {
         Row: ChatMessageRow;
         Insert: Omit<ChatMessageRow, "id" | "created_at">;
         Update: Partial<Omit<ChatMessageRow, "id" | "created_at">>;
+      };
+      gift_codes: {
+        Row: GiftCodeRow;
+        Insert: Omit<GiftCodeRow, "id" | "created_at">;
+        Update: Partial<Omit<GiftCodeRow, "id" | "created_at">>;
       };
     };
     Views: Record<string, never>;
