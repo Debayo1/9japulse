@@ -415,6 +415,84 @@ export async function ensureDbColumnsExist(): Promise<void> {
       END $$;
     `);
 
+    // 20. Ensure enum types exist for RPC functions
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'transaction_direction') THEN
+          CREATE TYPE transaction_direction AS ENUM ('debit', 'credit');
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'transaction_status') THEN
+          CREATE TYPE transaction_status AS ENUM ('pending', 'success', 'failed');
+        END IF;
+      END $$;
+    `);
+
+    // 21. Ensure atomic RPC functions exist (apply_transaction_safe, move_funds_safe, decrement_stock)
+    await client.query(`
+      CREATE OR REPLACE FUNCTION public.apply_transaction_safe(
+        p_wallet_id uuid, p_service_type text, p_amount numeric,
+        p_direction text, p_status text DEFAULT 'pending',
+        p_description text DEFAULT NULL, p_reference text DEFAULT NULL,
+        p_meta jsonb DEFAULT NULL, p_request_id uuid DEFAULT NULL
+      ) RETURNS json LANGUAGE plpgsql SECURITY DEFINER AS $body$
+      DECLARE
+        v_wallet wallets%ROWTYPE;
+        v_new_total numeric;
+        v_new_withdrawable numeric;
+        v_is_held boolean;
+        v_transaction transactions%ROWTYPE;
+      BEGIN
+        SELECT * INTO v_wallet FROM wallets WHERE id = p_wallet_id FOR UPDATE;
+        IF NOT FOUND THEN RAISE EXCEPTION 'Wallet not found'; END IF;
+        v_is_held := p_service_type = ANY(ARRAY['cashback','referral_bonus','contest_payout','reward']);
+        IF p_direction = 'credit' THEN
+          v_new_total := v_wallet.balance_total + p_amount;
+          v_new_withdrawable := CASE WHEN v_is_held THEN v_wallet.balance_withdrawable ELSE v_wallet.balance_withdrawable + p_amount END;
+        ELSE
+          IF v_wallet.balance_total < p_amount THEN RAISE EXCEPTION 'Insufficient total balance'; END IF;
+          IF v_wallet.balance_withdrawable < p_amount THEN RAISE EXCEPTION 'Insufficient withdrawable balance'; END IF;
+          v_new_total := v_wallet.balance_total - p_amount;
+          v_new_withdrawable := v_wallet.balance_withdrawable - p_amount;
+        END IF;
+        INSERT INTO transactions (wallet_id, service_type, amount, direction, status, description, reference, meta, request_id)
+        VALUES (p_wallet_id, p_service_type, p_amount, p_direction::transaction_direction, p_status::transaction_status, p_description, p_reference, p_meta, p_request_id)
+        RETURNING * INTO v_transaction;
+        UPDATE wallets SET balance_total = v_new_total, balance_withdrawable = v_new_withdrawable WHERE id = p_wallet_id;
+        RETURN JSON_BUILD_OBJECT('transaction', ROW_TO_JSON(v_transaction), 'balance_total', v_new_total, 'balance_withdrawable', v_new_withdrawable, 'idempotent', false);
+      END;
+      $body$;
+    `);
+
+    await client.query(`
+      CREATE OR REPLACE FUNCTION public.move_funds_safe(p_wallet_id uuid, p_amount numeric, p_to_withdrawable boolean)
+      RETURNS json LANGUAGE plpgsql SECURITY DEFINER AS $body$
+      DECLARE v_total numeric; v_withdrawable numeric;
+      BEGIN
+        SELECT balance_total, balance_withdrawable INTO v_total, v_withdrawable FROM wallets WHERE id = p_wallet_id FOR UPDATE;
+        IF p_to_withdrawable THEN
+          IF p_amount > (v_total - v_withdrawable) THEN RAISE EXCEPTION 'Insufficient held funds'; END IF;
+          v_withdrawable := v_withdrawable + p_amount;
+        ELSE
+          IF p_amount > v_withdrawable THEN RAISE EXCEPTION 'Insufficient withdrawable funds'; END IF;
+          v_withdrawable := v_withdrawable - p_amount;
+        END IF;
+        UPDATE wallets SET balance_withdrawable = v_withdrawable WHERE id = p_wallet_id;
+        RETURN JSON_BUILD_OBJECT('balance_total', v_total, 'balance_withdrawable', v_withdrawable);
+      END;
+      $body$;
+    `);
+
+    await client.query(`
+      CREATE OR REPLACE FUNCTION public.decrement_stock(p_row_id text)
+      RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER AS $body$
+      BEGIN
+        UPDATE marketplace_products SET stock_quantity = stock_quantity - 1 WHERE id = p_row_id AND stock_quantity > 0;
+        IF NOT FOUND THEN RAISE EXCEPTION 'Product out of stock or not found'; END IF;
+        RETURN true;
+      END;
+      $body$;
+    `);
+
     isDbVerified = true;
     console.log("[9jaPulse] Database self-healing schema checks verified successfully.");
   } catch (err: unknown) {
