@@ -16,6 +16,7 @@ export async function lookupUser(username: string) {
     .maybeSingle();
 
   if (!data) throw new Error("User not found");
+  if (data.id === user.id) throw new Error("That's your own username");
   return data;
 }
 
@@ -45,7 +46,7 @@ export async function transferFunds(recipientUsername: string, amount: number, p
   if (recipient.id === user.id) throw new Error("Cannot transfer to yourself");
 
   const wallet = await getWallet(user.id);
-  if (wallet.balance_total < amount) throw new Error("Insufficient balance");
+  if (wallet.balance_withdrawable < amount) throw new Error("Insufficient balance");
 
   const { data: rw } = await (svc as any)
     .from("wallets")
@@ -57,7 +58,7 @@ export async function transferFunds(recipientUsername: string, amount: number, p
   const ref = `TRF-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
   await applyTransaction(wallet.id, {
-    service_type: "transfer",
+    service_type: "p2p_transfer",
     amount,
     description: `Transfer to @${recipientUsername}`,
     status: "success",
@@ -65,9 +66,36 @@ export async function transferFunds(recipientUsername: string, amount: number, p
   });
 
   await applyTransaction(rw.id, {
-    service_type: "transfer",
+    service_type: "p2p_received",
     amount,
-    description: `Transfer from ${user.email ?? "user"}`,
+    description: `Transfer from @${profile.full_name ?? user.email ?? "user"}`,
+    status: "success",
+    reference: ref,
+  });
+
+  return { success: true, reference: ref };
+}
+
+export async function refundTransaction(walletId: string, transactionId: string, adminUserId: string) {
+  const user = await getUser();
+  if (!user) throw new Error("Unauthorized");
+
+  const svc = createServiceClient();
+  const { data: txn } = await (svc as any)
+    .from("transactions")
+    .select("*")
+    .eq("id", transactionId)
+    .single();
+
+  if (!txn) throw new Error("Transaction not found");
+  if (txn.status === "success") throw new Error("Transaction already succeeded");
+
+  const ref = `REF-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+
+  await applyTransaction(walletId, {
+    service_type: "refund",
+    amount: txn.amount,
+    description: `Refund for ${txn.reference ?? "failed transaction"}`,
     status: "success",
     reference: ref,
   });

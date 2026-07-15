@@ -1,199 +1,172 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowsLeftRight, User, CheckCircle } from "@phosphor-icons/react";
+import { useState, useTransition } from "react";
+import Header from "@/components/Header";
+import PinKeypad from "@/components/PinKeypad";
+import ConfirmationModal from "@/components/ConfirmationModal";
+import { SkeletonList } from "@/components/SkeletonLoader";
 import { toast } from "sonner";
 import { lookupUser, transferFunds } from "@/lib/transfers";
-import Header from "@/components/Header";
-
-interface Recipient {
-  id: string;
-  username: string;
-  full_name: string | null;
-  avatar_url: string | null;
-}
+import { User, CheckCircle } from "@phosphor-icons/react";
 
 export default function TransferPage() {
-  const router = useRouter();
-  const [step, setStep] = useState(1);
   const [username, setUsername] = useState("");
-  const [lookingUp, setLookingUp] = useState(false);
-  const [recipient, setRecipient] = useState<Recipient | null>(null);
+  const [recipient, setRecipient] = useState<any>(null);
   const [amount, setAmount] = useState("");
-  const [pin, setPin] = useState("");
-  const [sending, setSending] = useState(false);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [showPinPad, setShowPinPad] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
-  const handleLookup = async () => {
-    if (!username.trim()) return;
-    setLookingUp(true);
-    try {
-      const result = await lookupUser(username);
-      setRecipient(result);
-      setStep(2);
-      toast.success("User found");
-    } catch (e: any) {
-      toast.error(e.message);
-      setRecipient(null);
-    } finally {
-      setLookingUp(false);
-    }
+  const handleLookup = () => {
+    if (!username.trim()) return toast.error("Enter a username");
+    startTransition(async () => {
+      try {
+        const data = await lookupUser(username.trim());
+        setRecipient(data);
+        setStep(2);
+      } catch (e: any) {
+        toast.error(e.message);
+      }
+    });
   };
 
-  const handleTransfer = async () => {
-    if (!amount || !pin || !recipient) return;
-    setSending(true);
-    try {
-      const result = await transferFunds(
-        recipient.username,
-        Number(amount.replace(/,/g, "")),
-        pin
-      );
-      toast.success(`Transfer successful! Ref: ${result.reference}`);
-      setStep(4);
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setSending(false);
-    }
+  const handleConfirm = () => {
+    const amt = parseFloat(amount);
+    if (isNaN(amt) || amt < 100) return toast.error("Minimum transfer is ₦100");
+    setShowConfirm(false);
+    setShowPinPad(true);
   };
 
-  const reset = () => {
-    setStep(1);
-    setUsername("");
-    setRecipient(null);
-    setAmount("");
-    setPin("");
+  const handlePinComplete = (pin: string) => {
+    startTransition(async () => {
+      try {
+        await transferFunds(recipient.username, parseFloat(amount), pin);
+        setShowPinPad(false);
+        setSuccess(true);
+        toast.success("Transfer successful!");
+      } catch (e: any) {
+        toast.error(e.message);
+      }
+    });
   };
 
-  return (
-    <div className="page bg-zinc-950">
-      <Header title="Transfer Funds" />
-
-      {/* Steps indicator */}
-      <div className="flex gap-2 mb-6">
-        {[1, 2, 3].map((s) => (
-          <div
-            key={s}
-            className={`h-1 flex-1 rounded-full transition-colors ${
-              step >= s ? "bg-gradient-to-r from-emerald-500 to-teal-500" : "bg-white/10"
-            }`}
-          />
-        ))}
-      </div>
-
-      {step === 1 && (
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 animate-fade-in">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-              <User size={20} className="text-emerald-400" />
-            </div>
-            <div>
-              <p className="text-white font-semibold">Recipient</p>
-              <p className="text-zinc-400 text-sm">Enter their 9jaPulse username</p>
-            </div>
+  if (success) {
+    return (
+      <div className="page">
+        <div className="animate-fade-in" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1.5rem", textAlign: "center" }}>
+          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "color-mix(in srgb, var(--color-success) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <CheckCircle size={36} weight="fill" style={{ color: "var(--color-success)" }} />
           </div>
-          <div className="flex gap-2">
-            <input
-              className="input flex-1"
-              placeholder="@username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""))}
-              onKeyDown={(e) => e.key === "Enter" && handleLookup()}
-            />
-            <button
-              className="btn bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold px-5"
-              onClick={handleLookup}
-              disabled={lookingUp || !username.trim()}
-            >
-              {lookingUp ? "..." : "Find"}
-            </button>
+          <div>
+            <h2 style={{ fontSize: "1.25rem", fontWeight: 800, marginBottom: "0.25rem" }}>Transfer Complete</h2>
+            <p style={{ fontSize: "0.875rem" }}>₦{parseFloat(amount).toLocaleString()} sent to @{recipient?.username}</p>
           </div>
-        </div>
-      )}
-
-      {step === 2 && recipient && (
-        <div className="animate-fade-in space-y-4">
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white font-bold text-lg">
-                {(recipient.full_name || recipient.username).charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <p className="text-white font-semibold text-lg">{recipient.full_name || recipient.username}</p>
-                <p className="text-zinc-400 text-sm">@{recipient.username}</p>
-              </div>
-              <CheckCircle size={20} className="text-emerald-400 ml-auto" weight="fill" />
-            </div>
-          </div>
-
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5">
-            <label className="input-label text-zinc-400">Amount (₦)</label>
-            <input
-              className="input text-lg font-semibold"
-              type="number"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-            <p className="text-zinc-500 text-xs mt-2">No fee on transfers</p>
-          </div>
-
-          <button
-            className="btn btn-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold"
-            onClick={() => setStep(3)}
-            disabled={!amount || Number(amount) < 1}
-          >
-            Continue
-          </button>
-        </div>
-      )}
-
-      {step === 3 && (
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 animate-fade-in">
-          <div className="text-center mb-6">
-            <p className="text-zinc-400 text-sm">Amount to send</p>
-            <p className="text-white text-3xl font-bold mt-1">₦{Number(amount).toLocaleString()}</p>
-            <p className="text-zinc-500 text-xs mt-1">to @{recipient?.username}</p>
-          </div>
-
-          <label className="input-label text-zinc-400">Transaction PIN</label>
-          <input
-            className="input text-center tracking-widest text-lg"
-            type="password"
-            maxLength={4}
-            inputMode="numeric"
-            placeholder="• • • •"
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-          />
-
-          <div className="bg-white/5 rounded-xl p-3 mt-4 flex items-center gap-2">
-            <ArrowsLeftRight size={16} className="text-zinc-500" />
-            <p className="text-zinc-400 text-xs">Free transfer — no fees deducted</p>
-          </div>
-
-          <button
-            className="btn btn-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold mt-5"
-            onClick={handleTransfer}
-            disabled={sending || pin.length < 4}
-          >
-            {sending ? "Sending..." : "Confirm Transfer"}
-          </button>
-        </div>
-      )}
-
-      {step === 4 && (
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 text-center animate-fade-in">
-          <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle size={32} className="text-emerald-400" weight="fill" />
-          </div>
-          <p className="text-white text-xl font-bold">Transfer Sent!</p>
-          <p className="text-zinc-400 mt-1">₦{Number(amount).toLocaleString()} to @{recipient?.username}</p>
-          <button className="btn bg-white/10 text-white mt-6 w-full" onClick={reset}>
+          <button className="btn btn-primary" onClick={() => { setSuccess(false); setStep(1); setUsername(""); setAmount(""); setRecipient(null); }}>
             Send Another
           </button>
         </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="page">
+      <Header title="Transfer Funds" />
+
+      {isPending && step !== 3 && <SkeletonList rows={3} />}
+
+      {!isPending && (
+        <>
+          {/* Step 1: Lookup */}
+          {step === 1 && (
+            <section className="card animate-fade-in" style={{ marginBottom: "1rem" }}>
+              <label className="input-label">Recipient&apos;s Username</label>
+              <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                <input
+                  className="input"
+                  placeholder="@username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                  onKeyDown={(e) => e.key === "Enter" && handleLookup()}
+                />
+                <button className="btn btn-primary" onClick={handleLookup} disabled={!username.trim()}>
+                  <User size={16} />
+                  Find
+                </button>
+              </div>
+              <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: 0 }}>
+                Enter the recipient&apos;s unique 9jaPulse username
+              </p>
+            </section>
+          )}
+
+          {/* Step 2: Amount */}
+          {step === 2 && recipient && (
+            <section className="animate-fade-in">
+              <div className="glass-sm" style={{ padding: "1rem", marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <div style={{ width: 44, height: 44, borderRadius: "50%", background: "color-mix(in srgb, var(--color-primary) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-primary)", fontWeight: 700, fontSize: "1rem" }}>
+                  {recipient.full_name?.charAt(0) ?? "?"}
+                </div>
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: "0.9375rem", margin: 0 }}>{recipient.full_name ?? "User"}</p>
+                  <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", margin: 0 }}>@{recipient.username}</p>
+                </div>
+              </div>
+
+              <div className="card" style={{ marginBottom: "1rem" }}>
+                <label className="input-label">Amount (₦)</label>
+                <input
+                  className="input"
+                  type="number"
+                  placeholder="100"
+                  min={100}
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))}
+                />
+                <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.375rem", margin: 0 }}>
+                  No fee on 9jaPulse transfers
+                </p>
+              </div>
+
+              <div style={{ display: "flex", gap: "0.75rem" }}>
+                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setStep(1); setRecipient(null); }}>
+                  Back
+                </button>
+                <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => {
+                  const amt = parseFloat(amount);
+                  if (isNaN(amt) || amt < 100) return toast.error("Minimum transfer is ₦100");
+                  setShowConfirm(true);
+                }}>
+                  Continue
+                </button>
+              </div>
+            </section>
+          )}
+
+          {/* Step 3: Confirm */}
+          <ConfirmationModal show={showConfirm} title="Review Transfer" total={amount} onConfirm={handleConfirm} onClose={() => setShowConfirm(false)} loading={isPending}>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>To</span>
+              <span style={{ fontSize: "0.8125rem", fontWeight: 700 }}>{recipient?.full_name ?? "User"} (@{recipient?.username})</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>Fee</span>
+              <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--color-success)" }}>Free</span>
+            </div>
+          </ConfirmationModal>
+
+          <PinKeypad
+            show={showPinPad}
+            title="Enter PIN"
+            onPinComplete={handlePinComplete}
+            onClose={() => setShowPinPad(false)}
+            loading={isPending}
+            loadingTitle="Processing Transfer"
+            loadingSubtitle={`Sending ₦${parseFloat(amount || "0").toLocaleString()}`}
+          />
+        </>
       )}
     </div>
   );

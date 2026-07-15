@@ -1,88 +1,105 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { UserCircle, CheckCircle, XCircle } from "@phosphor-icons/react";
-import { toast } from "sonner";
-import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import { useEffect, useState, useRef } from "react";
 import Header from "@/components/Header";
 import ThemeSettingsCard from "@/components/ThemeSettingsCard";
+import { SkeletonList } from "@/components/SkeletonLoader";
+import { toast } from "sonner";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import { CheckCircle, XCircle } from "@phosphor-icons/react";
 
 export default function SettingsPage() {
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [username, setUsername] = useState("");
   const [originalUsername, setOriginalUsername] = useState("");
-  const [userId, setUserId] = useState("");
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [saving, setSaving] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [availability, setAvailability] = useState<"idle" | "available" | "taken" | "invalid">("idle");
+  const [available, setAvailable] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    (async () => {
-      const { data: { user } } = await supabaseBrowser.auth.getUser();
-      if (!user) return;
-      setUserId(user.id);
-      setEmail(user.email ?? "");
-      setName((user.user_metadata?.full_name as string) ?? user.email ?? "User");
-      const { data } = await (supabaseBrowser as any)
-        .from("profiles")
-        .select("username")
-        .eq("id", user.id)
-        .single();
-      if (data) {
-        setUsername(data.username ?? "");
-        setOriginalUsername(data.username ?? "");
+    async function load() {
+      try {
+        const { data: s } = await supabaseBrowser.auth.getSession();
+        const u = s?.session?.user;
+        if (!u) return;
+        setUser(u);
+
+        const { data: p } = await (supabaseBrowser as any)
+          .from("profiles")
+          .select("*")
+          .eq("id", u.id)
+          .maybeSingle();
+
+        setProfile(p);
+        const uname = p?.username ?? "";
+        setUsername(uname);
+        setOriginalUsername(uname);
+      } catch {
+        toast.error("Failed to load profile");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    })();
+    }
+    load();
   }, []);
 
-  const validate = (val: string) => {
-    if (val.length < 3 || val.length > 20) return false;
-    return /^[a-z0-9_]+$/.test(val);
-  };
+  const checkUsername = (val: string) => {
+    if (timer.current) clearTimeout(timer.current);
+    if (abortRef.current) abortRef.current.abort();
 
-  const checkUsername = async (val: string) => {
-    if (!validate(val)) { setAvailability("invalid"); return; }
-    if (val === originalUsername) { setAvailability("idle"); return; }
+    if (!val || val.length < 3 || val === originalUsername) {
+      setAvailable(null);
+      return;
+    }
+
     setChecking(true);
-    try {
-      const { data, error } = await supabaseBrowser
-        .from("profiles")
-        .select("id")
-        .eq("username", val)
-        .maybeSingle();
-      if (error) throw error;
-      setAvailability(data ? "taken" : "available");
-    } catch {
-      setAvailability("idle");
-    } finally {
-      setChecking(false);
-    }
+    timer.current = setTimeout(async () => {
+      const ac = new AbortController();
+      abortRef.current = ac;
+
+      try {
+        const { data, error } = await (supabaseBrowser as any)
+          .from("profiles")
+          .select("id")
+          .eq("username", val)
+          .maybeSingle();
+
+        if (ac.signal.aborted) return;
+        setAvailable(error ? null : !data);
+      } catch {
+        if (!ac.signal.aborted) setAvailable(null);
+      } finally {
+        if (!ac.signal.aborted) setChecking(false);
+      }
+    }, 400);
   };
 
-  const handleChange = (val: string) => {
-    const cleaned = val.toLowerCase().replace(/[^a-z0-9_]/g, "");
-    setUsername(cleaned);
-    setAvailability("idle");
-    if (cleaned.length >= 3) {
-      checkUsername(cleaned);
-    }
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20);
+    setUsername(val);
+    checkUsername(val);
   };
 
-  const handleSave = async () => {
-    if (!validate(username)) { toast.error("Username must be 3-20 lowercase chars"); return; }
-    if (availability === "taken") { toast.error("Username is already taken"); return; }
+  const handleSaveUsername = async () => {
+    if (username.length < 3 || username.length > 20) return toast.error("Username must be 3-20 characters");
+    if (!/^[a-z0-9_]+$/.test(username)) return toast.error("Only lowercase letters, numbers, and underscores");
+    if (available === false) return toast.error("Username already taken");
+
     setSaving(true);
     try {
       const { error } = await (supabaseBrowser as any)
         .from("profiles")
         .update({ username })
-        .eq("id", userId);
-      if (error) throw error;
+        .eq("id", user.id);
+
+      if (error) throw new Error(error.message);
       setOriginalUsername(username);
-      setAvailability("idle");
+      setAvailable(null);
+      localStorage.setItem("vtu_profile_cache", JSON.stringify({ fullName: profile?.full_name ?? user?.user_metadata?.full_name ?? "User", username }));
       toast.success("Username saved!");
     } catch (e: any) {
       toast.error(e.message);
@@ -91,74 +108,62 @@ export default function SettingsPage() {
     }
   };
 
-  const changed = username !== originalUsername;
-  const canSave = changed && validate(username) && availability === "available";
-
   if (loading) {
     return (
-      <div className="page bg-zinc-950">
+      <div className="page">
         <Header title="Account Settings" />
-        <div className="bg-white/5 rounded-2xl p-8 text-center text-zinc-500 text-sm">Loading...</div>
+        <SkeletonList rows={4} />
       </div>
     );
   }
 
+  const name = profile?.full_name ?? user?.user_metadata?.full_name ?? user?.email ?? "User";
+
   return (
-    <div className="page bg-zinc-950">
+    <div className="page">
       <Header title="Account Settings" />
 
-      <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 mb-4">
-        <p className="text-zinc-500 text-xs uppercase tracking-wider mb-1">Signed in as</p>
-        <h1 className="text-white text-xl font-bold">{name}</h1>
-        <p className="text-zinc-400 text-sm mt-0.5">{email}</p>
+      <section className="glass-sm animate-fade-in" style={{ padding: "1rem", marginBottom: "1rem" }}>
+        <p style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-muted)" }}>
+          Signed in as
+        </p>
+        <h1 style={{ fontSize: "1.25rem", marginTop: "0.25rem" }}>{name}</h1>
+        <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>{user?.email}</p>
       </section>
 
-      <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 mb-4">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-            <UserCircle size={20} className="text-emerald-400" />
+      <div className="card animate-fade-in" style={{ marginBottom: "1rem" }}>
+        <h3 style={{ marginBottom: "0.75rem" }}>Username</h3>
+        <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "0.75rem" }}>
+          Your unique @handle — others use this to send you money
+        </p>
+        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+          <div style={{ position: "relative", flex: 1 }}>
+            <span style={{ position: "absolute", left: "1rem", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", fontWeight: 600, fontSize: "0.875rem", pointerEvents: "none" }}>@</span>
+            <input
+              className="input"
+              style={{ paddingLeft: "2rem" }}
+              placeholder="username"
+              maxLength={20}
+              value={username}
+              onChange={handleUsernameChange}
+            />
           </div>
-          <div>
-            <p className="text-white font-semibold">Username</p>
-            <p className="text-zinc-400 text-xs">Choose a unique @username</p>
+          <button className="btn btn-primary" onClick={handleSaveUsername} disabled={!username || username === originalUsername || saving || available === false} style={{ whiteSpace: "nowrap" }}>
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+        {username !== originalUsername && username.length >= 3 && (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.375rem", fontSize: "0.75rem" }}>
+            {checking ? (
+              <span style={{ color: "var(--text-muted)" }}>Checking...</span>
+            ) : available === true ? (
+              <><CheckCircle size={14} style={{ color: "var(--color-success)" }} /><span style={{ color: "var(--color-success)", fontWeight: 600 }}>Available</span></>
+            ) : available === false ? (
+              <><XCircle size={14} style={{ color: "var(--color-danger)" }} /><span style={{ color: "var(--color-danger)", fontWeight: 600 }}>Taken</span></>
+            ) : null}
           </div>
-        </div>
-
-        <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 font-mono">@</span>
-          <input
-            className="input pl-8"
-            placeholder="username"
-            value={username}
-            onChange={(e) => handleChange(e.target.value)}
-          />
-        </div>
-
-        <div className="flex items-center gap-2 mt-2 min-h-5">
-          {checking && <span className="text-zinc-500 text-xs">Checking...</span>}
-          {!checking && availability === "available" && (
-            <span className="flex items-center gap-1 text-emerald-400 text-xs">
-              <CheckCircle size={12} weight="fill" /> Available
-            </span>
-          )}
-          {!checking && availability === "taken" && (
-            <span className="flex items-center gap-1 text-red-400 text-xs">
-              <XCircle size={12} weight="fill" /> Already taken
-            </span>
-          )}
-          {!checking && availability === "invalid" && (
-            <span className="text-zinc-500 text-xs">3-20 lowercase alphanumeric characters</span>
-          )}
-        </div>
-
-        <button
-          className="btn btn-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold mt-4"
-          onClick={handleSave}
-          disabled={!canSave || saving}
-        >
-          {saving ? "Saving..." : "Save Username"}
-        </button>
-      </section>
+        )}
+      </div>
 
       <ThemeSettingsCard />
     </div>

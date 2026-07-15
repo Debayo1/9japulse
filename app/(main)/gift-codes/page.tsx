@@ -1,289 +1,227 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Gift, Sparkle, CopySimple, CheckCircle } from "@phosphor-icons/react";
+import { useState, useEffect, useTransition } from "react";
+import Header from "@/components/Header";
+import PinKeypad from "@/components/PinKeypad";
+import { SkeletonList } from "@/components/SkeletonLoader";
 import { toast } from "sonner";
 import { createGiftCode, redeemGiftCode, getMyGiftCodes } from "@/lib/giftCodes";
-import Header from "@/components/Header";
-
-type Tab = "create" | "redeem";
+import { Gift, Sparkle, CopySimple, CheckCircle, ShareNetwork } from "@phosphor-icons/react";
 
 interface GiftCodeItem {
   id: string;
   code: string;
   amount: number;
-  status: "active" | "redeemed" | "expired" | "cancelled";
+  status: string;
   message: string | null;
   created_at: string;
-  redeemed_at: string | null;
+  profiles?: { full_name: string } | null;
 }
 
 export default function GiftCodesPage() {
-  const [tab, setTab] = useState<Tab>("create");
-  const [amount, setAmount] = useState("");
+  const [tab, setTab] = useState<"create" | "redeem">("create");
+  const [createAmount, setCreateAmount] = useState("");
   const [message, setMessage] = useState("");
-  const [generating, setGenerating] = useState(false);
-  const [generated, setGenerated] = useState<{ code: string; amount: number } | null>(null);
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [redeemCode, setRedeemCode] = useState("");
-  const [redeeming, setRedeeming] = useState(false);
-  const [redeemed, setRedeemed] = useState<{ amount: number; code: string } | null>(null);
+  const [redeemResult, setRedeemResult] = useState<{ amount: number; code: string } | null>(null);
   const [createdList, setCreatedList] = useState<GiftCodeItem[]>([]);
   const [redeemedList, setRedeemedList] = useState<GiftCodeItem[]>([]);
+  const [showPinPad, setShowPinPad] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [saving, startSaving] = useTransition();
 
-  const fetchCodes = useCallback(async () => {
-    try {
-      const data = await getMyGiftCodes();
-      setCreatedList(data.created);
-      setRedeemedList(data.redeemed);
-    } catch {
-      // silently fail
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    startSaving(async () => {
+      try {
+        const data = await getMyGiftCodes();
+        setCreatedList(data.created);
+        setRedeemedList(data.redeemed);
+      } catch {
+        toast.error("Failed to load gift codes");
+      } finally {
+        setLoading(false);
+      }
+    });
   }, []);
 
-  useEffect(() => { fetchCodes(); }, [fetchCodes]);
-
-  const handleGenerate = async () => {
-    const amt = Number(amount);
-    if (!amt || amt < 100) { toast.error("Minimum amount is ₦100"); return; }
-    setGenerating(true);
-    try {
-      const result = await createGiftCode(amt, message || undefined);
-      setGenerated(result);
-      toast.success("Gift code created!");
-      fetchCodes();
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setGenerating(false);
-    }
+  const handleCreate = () => {
+    const amt = parseFloat(createAmount);
+    if (isNaN(amt) || amt < 100) return toast.error("Minimum gift code amount is ₦100");
+    setShowPinPad(true);
   };
 
-  const handleRedeem = async () => {
-    if (!redeemCode.trim()) return;
-    setRedeeming(true);
-    try {
-      const result = await redeemGiftCode(redeemCode);
-      setRedeemed(result);
-      toast.success(`₦${result.amount} received!`);
-      fetchCodes();
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setRedeeming(false);
-    }
+  const handlePinComplete = (pin: string) => {
+    startSaving(async () => {
+      try {
+        const result = await createGiftCode(parseFloat(createAmount), message || undefined);
+        setGeneratedCode(result.code);
+        setShowPinPad(false);
+        toast.success("Gift code created!");
+        const data = await getMyGiftCodes();
+        setCreatedList(data.created);
+      } catch (e: any) {
+        toast.error(e.message);
+      }
+    });
   };
 
-  const copyCode = (code: string) => {
+  const handleRedeem = () => {
+    if (!redeemCode.trim()) return toast.error("Enter a gift code");
+    startSaving(async () => {
+      try {
+        const result = await redeemGiftCode(redeemCode);
+        setRedeemResult(result);
+        toast.success(`₦${result.amount.toLocaleString()} credited!`);
+        const data = await getMyGiftCodes();
+        setRedeemedList(data.redeemed);
+      } catch (e: any) {
+        toast.error(e.message);
+      }
+    });
+  };
+
+  const handleCopy = (code: string) => {
     navigator.clipboard.writeText(code);
     toast.success("Code copied!");
   };
 
+  const handleShare = (code: string, amount: number) => {
+    if (navigator.share) {
+      navigator.share({ title: "9jaPulse Gift Code", text: `I sent you a 9jaPulse gift code! Use code: ${code} worth ₦${amount.toLocaleString()}` });
+    } else {
+      handleCopy(code);
+    }
+  };
+
   const statusBadge = (status: string) => {
-    const map: Record<string, string> = {
-      active: "bg-emerald-500/20 text-emerald-400",
-      redeemed: "bg-blue-500/20 text-blue-400",
-      expired: "bg-yellow-500/20 text-yellow-400",
-      cancelled: "bg-red-500/20 text-red-400",
+    const variants: Record<string, string> = {
+      active: "badge-success",
+      redeemed: "",
+      expired: "badge-warning",
+      cancelled: "badge-danger",
     };
-    return `badge ${map[status] || "bg-white/10 text-zinc-400"}`;
+    const labels: Record<string, string> = {
+      active: "Active",
+      redeemed: "Redeemed",
+      expired: "Expired",
+      cancelled: "Cancelled",
+    };
+    return <span className={`badge ${variants[status] ?? ""}`} style={status === "redeemed" ? { background: "color-mix(in srgb, var(--color-primary) 10%, transparent)", color: "var(--color-primary)" } : undefined}>{labels[status] ?? status}</span>;
   };
 
   return (
-    <div className="page bg-zinc-950">
+    <div className="page">
       <Header title="Gift Codes" />
 
       {/* Tabs */}
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-1 flex mb-6">
-        {(["create", "redeem"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all ${
-              tab === t
-                ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white"
-                : "text-zinc-400"
-            }`}
-            onClick={() => setTab(t)}
-          >
+      <div className="glass-sm" style={{ display: "flex", marginBottom: "1rem", padding: "0.25rem" }}>
+        {(["create", "redeem"] as const).map((t) => (
+          <button key={t} className="btn btn-ghost" style={{ flex: 1, height: "40px", fontSize: "0.8125rem", background: tab === t ? "var(--bg-elevated)" : "transparent", border: tab === t ? "1px solid var(--border)" : "none" }} onClick={() => { setTab(t); setGeneratedCode(null); setRedeemResult(null); }}>
             {t === "create" ? "Create" : "Redeem"}
           </button>
         ))}
       </div>
 
       {tab === "create" && (
-        <div className="space-y-4 animate-fade-in">
-          {!generated ? (
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                  <Sparkle size={20} className="text-emerald-400" />
-                </div>
-                <div>
-                  <p className="text-white font-semibold">New Gift Code</p>
-                  <p className="text-zinc-400 text-xs">Create a code to send to someone</p>
-                </div>
+        <section className="animate-fade-in">
+          <div className="card" style={{ marginBottom: "1rem" }}>
+            <label className="input-label">Amount (₦)</label>
+            <input className="input" type="number" placeholder="100" min={100} value={createAmount} onChange={(e) => setCreateAmount(e.target.value.replace(/[^0-9]/g, ""))} style={{ marginBottom: "0.75rem" }} />
+            <label className="input-label">Message (optional)</label>
+            <textarea className="input" placeholder="Happy birthday! 🎉" rows={2} value={message} onChange={(e) => setMessage(e.target.value)} style={{ resize: "none", marginBottom: "0.75rem" }} />
+            <button className="btn btn-primary btn-full" onClick={handleCreate} disabled={!createAmount}>
+              <Sparkle size={16} />
+              Generate Code
+            </button>
+          </div>
+
+          {generatedCode && (
+            <div className="glass animate-fade-in" style={{ padding: "1.5rem", textAlign: "center", marginBottom: "1rem" }}>
+              <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.75rem" }}>New Gift Code</p>
+              <p style={{ fontSize: "2rem", fontWeight: 900, letterSpacing: "0.12em", fontFamily: "monospace", margin: "0 0 0.5rem", color: "var(--text-primary)" }}>{generatedCode}</p>
+              <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "1rem" }}>Worth ₦{parseFloat(createAmount).toLocaleString()}</p>
+              <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center" }}>
+                <button className="btn btn-secondary" onClick={() => handleCopy(generatedCode)}>
+                  <CopySimple size={16} />
+                  Copy
+                </button>
+                <button className="btn btn-primary" onClick={() => handleShare(generatedCode, parseFloat(createAmount))}>
+                  <ShareNetwork size={16} />
+                  Share
+                </button>
               </div>
-
-              <label className="input-label text-zinc-400">Amount (₦)</label>
-              <input
-                className="input mb-4"
-                type="number"
-                placeholder="100"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-
-              <label className="input-label text-zinc-400">Message (optional)</label>
-              <textarea
-                className="input mb-4 resize-none"
-                rows={3}
-                placeholder="Happy birthday! 🎉"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-              />
-
-              <button
-                className="btn btn-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold"
-                onClick={handleGenerate}
-                disabled={generating || !amount}
-              >
-                {generating ? "Generating..." : "Generate Code"}
-              </button>
-            </div>
-          ) : (
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 text-center animate-scale-in">
-              <CheckCircle size={28} className="text-emerald-400 mx-auto mb-3" weight="fill" />
-              <p className="text-white font-semibold">Code Generated!</p>
-              <p className="text-zinc-400 text-sm mb-4">₦{generated.amount.toLocaleString()} gift code</p>
-
-              <div
-                className="bg-white/10 rounded-xl py-4 px-6 mb-4 cursor-pointer border border-white/10"
-                onClick={() => copyCode(generated.code)}
-              >
-                <p className="text-white text-2xl font-bold tracking-widest font-mono">
-                  {generated.code}
-                </p>
-              </div>
-
-              <button
-                className="btn btn-full bg-white/10 text-white"
-                onClick={() => copyCode(generated.code)}
-              >
-                <CopySimple size={18} />
-                Copy Code
-              </button>
-
-              <button
-                className="btn btn-full text-zinc-400 mt-2"
-                onClick={() => { setGenerated(null); setAmount(""); setMessage(""); }}
-              >
-                Create Another
-              </button>
             </div>
           )}
-        </div>
+        </section>
       )}
 
       {tab === "redeem" && (
-        <div className="space-y-4 animate-fade-in">
-          {!redeemed ? (
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                  <Gift size={20} className="text-emerald-400" />
-                </div>
-                <div>
-                  <p className="text-white font-semibold">Redeem Code</p>
-                  <p className="text-zinc-400 text-xs">Enter a gift code you received</p>
-                </div>
+        <section className="animate-fade-in">
+          <div className="card" style={{ marginBottom: "1rem" }}>
+            <label className="input-label">Gift Code</label>
+            <input className="input" placeholder="Enter code" value={redeemCode} onChange={(e) => setRedeemCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} style={{ marginBottom: "0.75rem" }} />
+            <button className="btn btn-primary btn-full" onClick={handleRedeem} disabled={redeemCode.length < 8 || saving}>
+              <Gift size={16} />
+              Redeem
+            </button>
+          </div>
+
+          {redeemResult && (
+            <div className="glass animate-fade-in" style={{ padding: "1.5rem", textAlign: "center", marginBottom: "1rem" }}>
+              <div style={{ width: 56, height: 56, borderRadius: "50%", background: "color-mix(in srgb, var(--color-success) 12%, transparent)", color: "var(--color-success)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 0.75rem" }}>
+                <CheckCircle size={28} weight="fill" />
               </div>
-
-              <input
-                className="input mb-4 text-center text-lg tracking-widest uppercase font-mono"
-                placeholder="XXXXXXXX"
-                value={redeemCode}
-                onChange={(e) => setRedeemCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8))}
-                onKeyDown={(e) => e.key === "Enter" && handleRedeem()}
-              />
-
-              <button
-                className="btn btn-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold"
-                onClick={handleRedeem}
-                disabled={redeeming || redeemCode.length < 8}
-              >
-                {redeeming ? "Redeeming..." : "Redeem"}
-              </button>
-            </div>
-          ) : (
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 text-center animate-scale-in">
-              <CheckCircle size={28} className="text-emerald-400 mx-auto mb-3" weight="fill" />
-              <p className="text-white font-semibold text-lg">₦{redeemed.amount.toLocaleString()} Received!</p>
-              <p className="text-zinc-400 text-sm mb-4">Code: {redeemed.code}</p>
-              <button className="btn btn-full bg-white/10 text-white" onClick={() => setRedeemed(null)}>
-                Redeem Another
-              </button>
+              <p style={{ fontWeight: 800, fontSize: "1.375rem", margin: "0 0 0.25rem" }}>₦{redeemResult.amount.toLocaleString()}</p>
+              <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: 0 }}>Code: {redeemResult.code}</p>
             </div>
           )}
-        </div>
+        </section>
       )}
 
       {/* History */}
-      <section className="mt-6 space-y-3">
-        <h2 className="text-white font-semibold text-sm flex items-center gap-2">
-          <Gift size={16} className="text-zinc-400" />
-          My Gift Codes
-        </h2>
+      <div style={{ marginTop: "1.5rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+          <Gift size={16} style={{ color: "var(--text-secondary)" }} />
+          <h3 style={{ margin: 0 }}>My Gift Codes</h3>
+        </div>
 
         {loading ? (
-          <div className="bg-white/5 rounded-2xl p-8 text-center text-zinc-500 text-sm">Loading...</div>
+          <SkeletonList rows={3} />
         ) : createdList.length === 0 && redeemedList.length === 0 ? (
-          <div className="bg-white/5 rounded-2xl p-8 text-center text-zinc-500 text-sm">No gift codes yet</div>
+          <div className="card" style={{ textAlign: "center", padding: "2rem 1rem" }}>
+            <Gift size={32} style={{ color: "var(--text-muted)", marginBottom: "0.5rem" }} />
+            <p style={{ fontSize: "0.875rem", margin: 0 }}>No gift codes yet</p>
+            {tab === "create" && <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>Create one above to get started</p>}
+          </div>
         ) : (
-          <>
-            {createdList.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4 flex items-center justify-between"
-              >
-                <div>
-                  <p className="text-white font-mono text-sm tracking-wider">{item.code}</p>
-                  <p className="text-zinc-400 text-xs mt-0.5">₦{item.amount.toLocaleString()}</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            {[...createdList, ...redeemedList].slice(0, 20).map((item) => (
+              <div key={item.id} className="card" style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.75rem 1rem" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontWeight: 700, fontSize: "0.8125rem", margin: 0, fontFamily: "monospace" }}>{item.code}</p>
+                  <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", margin: "2px 0 0" }}>
+                    ₦{item.amount.toLocaleString()} &middot; {new Date(item.created_at).toLocaleDateString()}
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={statusBadge(item.status)}>{item.status}</span>
-                  <button
-                    className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
-                    onClick={() => copyCode(item.code)}
-                  >
-                    <CopySimple size={14} className="text-zinc-400" />
-                  </button>
-                </div>
+                {statusBadge(item.status)}
               </div>
             ))}
-            {redeemedList.length > 0 && (
-              <div className="mt-4">
-                <p className="text-zinc-500 text-xs mb-2 uppercase tracking-wider">Redeemed by you</p>
-                {redeemedList.map((item: any) => (
-                  <div
-                    key={item.id}
-                    className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-4 flex items-center justify-between mb-2"
-                  >
-                    <div>
-                      <p className="text-white font-mono text-sm tracking-wider">{item.code}</p>
-                      <p className="text-zinc-400 text-xs mt-0.5">
-                        ₦{item.amount.toLocaleString()} — {item.profiles?.full_name || "Someone"}
-                      </p>
-                    </div>
-                    <span className={statusBadge(item.status)}>{item.status}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
+          </div>
         )}
-      </section>
+      </div>
+
+      <PinKeypad
+        show={showPinPad}
+        title="Confirm Gift Code"
+        onPinComplete={handlePinComplete}
+        onClose={() => setShowPinPad(false)}
+        loading={saving}
+        loadingTitle="Creating Gift Code"
+        loadingSubtitle={`Deducting ₦${parseFloat(createAmount || "0").toLocaleString()}`}
+      >
+        ₦{parseFloat(createAmount || "0").toLocaleString()} will be deducted
+      </PinKeypad>
     </div>
   );
 }
