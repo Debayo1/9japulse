@@ -262,6 +262,18 @@ export default function MePage() {
             <CaretRight size={14} weight="bold" color="var(--text-muted)" />
           </Link>
 
+          <Link
+            href="/gift-codes"
+            style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.875rem 1rem", textDecoration: "none" }}
+            className="card"
+          >
+            <div style={{ width: 32, height: 32, borderRadius: 10, background: "color-mix(in srgb, var(--color-accent) 10%, transparent)", display: "flex", alignItems: "center", color: "var(--color-accent)", justifyContent: "center" }}>
+              <Award size={18} />
+            </div>
+            <span style={{ flex: 1, fontWeight: 600, fontSize: "0.8125rem", color: "var(--text-primary)" }}>Gift Codes</span>
+            <CaretRight size={14} weight="bold" color="var(--text-muted)" />
+          </Link>
+
           {isAdmin && (
             <Link
               href="/admin"

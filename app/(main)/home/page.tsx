@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Smartphone, World, CloudLightning, Airplay, Book, CoinStack, Certificate, ShoppingBag } from "@duo-icons/react";
+import { Smartphone, World, CloudLightning, Airplay, Book, CoinStack, Certificate, ShoppingBag, Rocket, Award } from "@duo-icons/react";
 import WalletCard from "@/components/WalletCard";
 import { HistoryList } from "@/components/HistoryList";
 import { SkeletonWallet, SkeletonList, SkeletonServices } from "@/components/SkeletonLoader";
@@ -20,6 +20,8 @@ const SERVICES = [
   { label: "Betting",     Icon: CoinStack,      href: "/services/betting",      color: "#06B6D4" },
   { label: "Exam PIN",    Icon: Certificate,    href: "/services/exam",         color: "#F97316" },
   { label: "Marketplace", Icon: ShoppingBag,    href: "/services/marketplace", color: "#E74C3C" },
+  { label: "Transfer",  Icon: Rocket,     href: "/transfer",   color: "#8B5CF6" },
+  { label: "Gift Code", Icon: Award,      href: "/gift-codes", color: "#F59E0B" },
 ] as const;
 
 export default function HomePage() {

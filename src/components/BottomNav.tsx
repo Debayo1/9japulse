@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Dashboard, AppDots, CreditCard, User } from "@duo-icons/react";
+import { Dashboard, AppDots, CreditCard, User, Rocket } from "@duo-icons/react";
 
 const NAV_ITEMS = [
-  { label: "Home",     href: "/home",     Icon: Dashboard },
-  { label: "Services", href: "/services", Icon: AppDots   },
+  { label: "Home",     href: "/home",     Icon: Dashboard  },
+  { label: "Services", href: "/services", Icon: AppDots    },
+  { label: "Transfer", href: "/transfer", Icon: Rocket     },
   { label: "Card",     href: "/card",     Icon: CreditCard },
   { label: "Me",       href: "/me",       Icon: User       },
 ] as const;
@@ -15,7 +16,7 @@ export default function BottomNav() {
   const pathname = usePathname();
 
   // Show bottom navigation ONLY on main shell pages
-  const showNav = pathname === "/home" || pathname === "/services" || pathname === "/card" || pathname === "/me";
+  const showNav = pathname === "/home" || pathname === "/services" || pathname === "/transfer" || pathname === "/card" || pathname === "/me";
   if (!showNav) return null;
 
   return (
