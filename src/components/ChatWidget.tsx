@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { toast } from "sonner";
 import {
   ChatCircle,
   X,
@@ -138,6 +139,19 @@ export default function ChatWidget() {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  }
+
+  function handlePaste(e: React.ClipboardEvent) {
+    const items = e.clipboardData?.items;
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith("image/")) {
+          e.preventDefault();
+          toast.error("Image pasting is not supported. Please send text only.");
+          return;
+        }
+      }
     }
   }
 
@@ -378,6 +392,7 @@ export default function ChatWidget() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               placeholder={hitLimit ? "Upgrade to continue..." : "Type a message..."}
               disabled={hitLimit}
               style={{
